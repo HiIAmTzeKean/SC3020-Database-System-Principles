@@ -182,5 +182,40 @@ void Storage::reportStatistics(const std::vector<Record> &records) {
     int recordsPerBlock = Block::maxRecordsPerBlock();
     int totalBlocks = (totalRecords + recordsPerBlock - 1) / recordsPerBlock;
 
-    std::cout << "Record size: " << Record::size() << " bytes ("<< Record::size_unpadded() << " bytes without padding)\n";
+    
+    std::cout << "\nTask 1: Storage" << "\n";
+    std::cout << "Record size: " << Record::size() << " bytes ("<< Record::sizeUnpadded() << " bytes without padding)\n";
+    std::cout << "Number of Records: " << totalRecords << "\n";
+    std::cout << "Number of Records per Block: " << recordsPerBlock << "\n";
+    std::cout << "Number of Blocks: " << totalBlocks << "\n";
+}
+
+void Storage::bruteForceScan(std::vector<Record> const &records, float min, float max) {
+    int blockCount = 0;
+    int filteredRecordCount = 0;
+    float sum = 0;
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < records.size(); i++) {
+        if (i % Block::maxRecordsPerBlock() == 0) {
+            blockCount++;
+        }
+
+        if (records[i].fg_pct_home >= min && records[i].fg_pct_home <= max) {
+            sum += records[i].fg3_pct_home;
+            filteredRecordCount++;
+        }
+    }
+    auto end = std::chrono::high_resolution_clock::now();  // End time
+
+    std::cout << "\nTask 3: Brute-force Linear Scan (search 'FG_PCT_HOME' from 0.6 to 0.9, both inclusively)" << "\n";
+    std::cout << "Number of records found in range: " << filteredRecordCount << '\n';
+    std::cout << "Number of data blocks accessed: " << blockCount << '\n';
+    if (filteredRecordCount > 0) {
+        float avg = sum / filteredRecordCount;
+        std::cout << "Average of 'FG3_PCT_home': " << avg << '\n';
+    }
+
+    std::chrono::duration<double> time_taken = end - start;  // Duration in seconds
+    std::cout << "Brute-force scan time: " << time_taken.count() << " seconds" << '\n';
 }

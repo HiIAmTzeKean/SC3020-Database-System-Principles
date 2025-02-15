@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <chrono>
 
 struct Record {
     uint32_t game_date_est;     // 4 bytes (DDMMYYYY)
@@ -39,6 +40,7 @@ struct Storage {
     void writeDatabaseFile(const std::string &filename, const std::vector<Record> &records);
     void readDatabaseFile(const std::string &filename, std::vector<Record> &records);
     void reportStatistics(const std::vector<Record> &records);
+    void bruteForceScan(std::vector<Record> const &records, float min, float max);
 };
 
 #endif  // STORAGE_H
