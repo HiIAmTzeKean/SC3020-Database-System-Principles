@@ -17,10 +17,22 @@ int Block::maxRecordsPerBlock() {
 }
 
 // Serialize Block data into a buffer
-void Block::serialize(char *buffer) {
+void Block::serialize(char *buffer, int *bytesToWrite) {
     int offset = 0;
+    int recordSize = 0;
     for (const auto &record : records) {
         std::memcpy(buffer + offset, &record, Record::size());
+        offset += Record::size();
+    }
+    *bytesToWrite = offset;
+}
+
+void Block::deserialize(char *buffer, std::vector<Record> &records, int bytesToRead) {
+    int offset = 0;
+    while (offset + Record::size() <= bytesToRead) {
+        Record record;
+        std::memcpy(&record, buffer + offset, Record::size());
+        records.push_back(record);
         offset += Record::size();
     }
 }
@@ -43,18 +55,21 @@ std::vector<Record> Storage::readRecordsFromFile(const std::string &filename) {
         Record record;
 
         std::string game_date;
-        ss >> game_date;
+        // Skip line if field value is missing
+        if (!(ss >> game_date >> 
+              record.team_id_home >> 
+              record.pts_home >> 
+              record.fg_pct_home >> 
+              record.ft_pct_home >> 
+              record.fg3_pct_home >> 
+              record.ast_home >> 
+              record.reb_home >> 
+              record.home_team_wins)) {
+            continue;
+        }
+
         std::strncpy(record.game_date_est, game_date.c_str(), sizeof(record.game_date_est) - 1);
-
-        ss >> record.team_id_home;
-        ss >> record.pts_home;
-        ss >> record.fg_pct_home;
-        ss >> record.ft_pct_home;
-        ss >> record.fg3_pct_home;
-        ss >> record.ast_home;
-        ss >> record.reb_home;
-        ss >> record.home_team_wins;
-
+        record.game_date_est[sizeof(record.game_date_est) - 1] = '\0';
         records.push_back(record);
     }
 
@@ -72,27 +87,61 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
     int maxRecords = Block::maxRecordsPerBlock();
     char buffer[BLOCK_SIZE];
     Block block;
+    int bytesToWrite;
     int totalBlocks = 0;
+    int totalRecords = 0;
 
     for (const auto &record : records) {
         block.records.push_back(record);
         if (block.records.size() == maxRecords) {
-            block.serialize(buffer);
+            block.serialize(buffer, &bytesToWrite);
             file.write(buffer, BLOCK_SIZE);
-            block.records.clear();
             totalBlocks++;
+            totalRecords += block.records.size();
+            block.records.clear();
         }
     }
 
+    // Serialize partial block
     if (!block.records.empty()) {
-        block.serialize(buffer);
-        file.write(buffer, BLOCK_SIZE);
+        block.serialize(buffer, &bytesToWrite);
+        file.write(buffer, bytesToWrite);  // Write only the used portion of the block
         totalBlocks++;
+        totalRecords += block.records.size();
+        block.records.clear();
     }
-
     file.close();
+
     std::cout << "Database file written successfully.\n";
     std::cout << "Total blocks written: " << totalBlocks << "\n";
+    std::cout << "Total records written: " << totalRecords << "\n";
+}
+
+void Storage::readDatabaseFile(const std::string &filename, std::vector<Record> &records) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+        std::cerr << "Error opening file for reading.\n";
+        return;
+    }
+
+    char buffer[BLOCK_SIZE];
+    Block block;
+    int blockCount = 0;
+    int recordCount = 0;
+
+    while (file.read(buffer, BLOCK_SIZE) || file.gcount()) {
+        int bytesToRead = file.gcount() < BLOCK_SIZE 
+            ? file.gcount() // Read partial block 
+            : BLOCK_SIZE;
+
+        block.deserialize(buffer, records, bytesToRead);
+        blockCount++;
+    }
+    file.close();
+
+    std::cout << "Database file read successfully.\n";
+    std::cout << "Total blocks read: " << blockCount << "\n";
+    std::cout << "Total records read: " << records.size() << "\n";
 }
 
 void Storage::reportStatistics(const std::vector<Record> &records) {

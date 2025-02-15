@@ -28,13 +28,15 @@ struct Block {
     std::vector<Record> records;
 
     static int maxRecordsPerBlock();
-    void serialize(char *buffer);
+    void serialize(char *buffer, int *bytesToWrite);
+    void deserialize(char *buffer, std::vector<Record> &records, int bytesToRead);
 };
 
 struct Storage {
     std::vector<Record> readRecordsFromFile(const std::string &filename);
 
     void writeDatabaseFile(const std::string &filename, const std::vector<Record> &records);
+    void readDatabaseFile(const std::string &filename, std::vector<Record> &records);
     void reportStatistics(const std::vector<Record> &records);
 };
 

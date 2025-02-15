@@ -15,5 +15,8 @@ int main() {
     std::string outputFile = "nba_database.dat";
     storage.writeDatabaseFile(outputFile, records);
 
+    std::vector<Record> loadedRecords;
+    storage.readDatabaseFile(outputFile, loadedRecords);
+
     return 0;
 }
