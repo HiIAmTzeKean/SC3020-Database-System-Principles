@@ -11,17 +11,18 @@
 #include <vector>
 
 struct Record {
-    char game_date_est[11];  // "DD/MM/YYY\0" (11 bytes)
-    int team_id_home;        // 4 bytes
-    int pts_home;            // 4 bytes
-    float fg_pct_home;       // 4 bytes
-    float ft_pct_home;       // 4 bytes
-    float fg3_pct_home;      // 4 bytes
-    int ast_home;            // 4 bytes
-    int reb_home;            // 4 bytes
-    bool home_team_wins;     // 1 byte
+    uint32_t game_date_est;     // 4 bytes (DDMMYYYY)
+    uint32_t team_id_home;      // 4 bytes (0-4,294,967,295)
+    float fg_pct_home;          // 4 bytes
+    float ft_pct_home;          // 4 bytes
+    float fg3_pct_home;         // 4 bytes
+    uint16_t ast_home;          // 2 bytes (0-65,535)
+    uint16_t reb_home;          // 2 bytes (0-65,535)
+    uint16_t pts_home;          // 2 bytes (0-65,535)
+    bool home_team_wins;        // 1 byte
 
-    static int size();
+    static int sizeUnpadded();          // 27 bytes
+    static int size();                   // 28 bytes (actual size w/ padding)
 };
 
 struct Block {

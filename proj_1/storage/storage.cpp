@@ -1,6 +1,6 @@
 #include "storage.h"
 
-int Record::size() {
+int Record::sizeUnpadded() {
     return sizeof(game_date_est) +
            sizeof(team_id_home) +
            sizeof(pts_home) +
@@ -10,6 +10,11 @@ int Record::size() {
            sizeof(ast_home) +
            sizeof(reb_home) +
            sizeof(home_team_wins);
+}
+
+// Actual size allocated with padding
+int Record::size() {
+    return sizeof(Record);
 }
 
 int Block::maxRecordsPerBlock() {
@@ -54,9 +59,9 @@ std::vector<Record> Storage::readRecordsFromFile(const std::string &filename) {
         std::istringstream ss(line);
         Record record;
 
-        std::string game_date;
+        std::string game_date_est;
         // Skip line if field value is missing
-        if (!(ss >> game_date >> 
+        if (!(ss >> game_date_est >> 
               record.team_id_home >> 
               record.pts_home >> 
               record.fg_pct_home >> 
@@ -68,8 +73,14 @@ std::vector<Record> Storage::readRecordsFromFile(const std::string &filename) {
             continue;
         }
 
-        std::strncpy(record.game_date_est, game_date.c_str(), sizeof(record.game_date_est) - 1);
-        record.game_date_est[sizeof(record.game_date_est) - 1] = '\0';
+        // Convert game_date_est string (DD/MM/YYYY) to uint32_t as DDMMYYYY
+        int day, month, year;
+        if (sscanf(game_date_est.c_str(), "%2d/%2d/%4d", &day, &month, &year) == 3) {
+            record.game_date_est = (day * 1000000) + (month * 10000) + year;
+        } else {
+            std::cerr << "Error: Invalid date format: " << game_date_est << "\n";
+            continue;
+        }
         records.push_back(record);
     }
 
@@ -137,6 +148,28 @@ void Storage::readDatabaseFile(const std::string &filename, std::vector<Record> 
         block.deserialize(buffer, records, bytesToRead);
         blockCount++;
     }
+
+    //// TODO: remove after done with testing. outputs a .txt file that can be diff-ed with original "games.txt" 
+    // std::ofstream debugFile("debug_games.txt");
+    // for (auto& record : records) {
+    //     uint32_t date = record.game_date_est;
+    //     int day = date / 1000000;
+    //     int month = (date / 10000) % 100;
+    //     int year = date % 10000; 
+    //     char game_date_est[11];  // "DD/MM/YYYY\0"
+    //     snprintf(game_date_est, sizeof(game_date_est), "%d/%d/%d", day, month, year);
+
+    //     debugFile << game_date_est << "\t"
+    //              << record.team_id_home << "\t"
+    //              << record.pts_home << "\t"
+    //              << record.fg_pct_home << "\t"
+    //              << record.ft_pct_home << "\t"
+    //              << record.fg3_pct_home << "\t"
+    //              << record.ast_home << "\t"
+    //              << record.reb_home << "\t"
+    //              << record.home_team_wins << "\n";
+    // }
+    // debugFile.close();
     file.close();
 
     std::cout << "Database file read successfully.\n";
@@ -145,21 +178,9 @@ void Storage::readDatabaseFile(const std::string &filename, std::vector<Record> 
 }
 
 void Storage::reportStatistics(const std::vector<Record> &records) {
-    int recordSize = Record::size();
     int totalRecords = records.size();
     int recordsPerBlock = Block::maxRecordsPerBlock();
     int totalBlocks = (totalRecords + recordsPerBlock - 1) / recordsPerBlock;
 
-    // std::cout << "game_date_est: " << sizeof(Record::game_date_est) << " bytes\n";
-    // std::cout << "team_id_home: " << sizeof(Record::team_id_home) << " bytes\n";
-    // std::cout << "pts_home: " << sizeof(Record::pts_home) << " bytes\n";
-    // std::cout << "fg_pct_home: " << sizeof(Record::fg_pct_home) << " bytes\n";
-    // std::cout << "ft_pct_home: " << sizeof(Record::ft_pct_home) << " bytes\n";
-    // std::cout << "fg3_pct_home: " << sizeof(Record::fg3_pct_home) << " bytes\n";
-    // std::cout << "ast_home: " << sizeof(Record::ast_home) << " bytes\n";
-    // std::cout << "reb_home: " << sizeof(Record::reb_home) << " bytes\n";
-    // std::cout << "home_team_wins: " << sizeof(Record::home_team_wins) << " bytes\n";
-    // std::cout << "Record size: " << sizeof(Record) << " bytes\n";
-
-    std::cout << "Record size: " << recordSize << " bytes\n";
+    std::cout << "Record size: " << Record::size() << " bytes ("<< Record::size_unpadded() << " bytes without padding)\n";
 }
