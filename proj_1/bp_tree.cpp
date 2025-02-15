@@ -2,7 +2,7 @@
 #include "bp_tree.h"
 #include <vector>
 #include <iostream>
-
+#include <utility>
 
 int ceil_div(int a, int b)
 {
@@ -27,7 +27,7 @@ Node::Node(int degree, bool is_leaf) : is_leaf(is_leaf), degree(degree)
         this->next = nullptr;
     }
     else
-    {   
+    {
         // internal node has degree + 1 pointers
         degree++;
         this->degree = degree;
@@ -48,6 +48,10 @@ Node::~Node()
     }
     else
     {
+        for (int i = 0; i < degree + 1; ++i)
+        {
+            delete node_values[i];
+        }
         delete[] node_values;
     }
 };
@@ -67,6 +71,7 @@ void Node::insert(float key, Record *record)
         this->keys[i + 1] = key;
         this->record_values[i + 1] = record;
         this->size++;
+        std::cout << "Size is " << this->size << std::endl;
     }
     else
     {
@@ -79,7 +84,7 @@ void Node::insert(float key, Record *record)
         std::cout << "Key identified: " << i << std::endl;
         std::cout << "Current size: " << size << std::endl;
         // check if child node is full
-        if (node_values[i + 1]->size == degree)
+        if (node_values[i + 1]->size == node_values[i + 1]->degree)
         {
             std::cout << "Child node is full. Splitting child node." << std::endl;
             split_child(i + 1);
@@ -95,44 +100,48 @@ void Node::insert(float key, Record *record)
 void Node::split_child(int index)
 {
     Node *child = node_values[index];
-    Node *new_child = new Node(this->degree, child->is_leaf);
+    Node *new_child = new Node(child->degree, child->is_leaf);
     int t = 0;
     if (child->is_leaf)
     {
-        std::cout << "Splitting leaf node." << std::endl;
-        t = (this->degree + 1) / 2;
+        std::cout << "Splitting leaf node. Degree " << child->degree << std::endl;
+        t = (child->degree + 1) / 2;
     }
     else
     {
-        std::cout << "Splitting internal node." << std::endl;
-        t = this->degree / 2 + 1;
+        std::cout << "Splitting internal node. Degree " << child->degree << std::endl;
+        t = child->degree / 2;
     }
-    child->size = this->degree - t;
+    child->size = child->degree - t;
     new_child->size = t;
+    std::cout << "Size of left and right is " << child->size << " " << new_child->size << std::endl;
+
+    for (int i = 0; i < t; i++)
+    {
+        new_child->keys[i] = child->keys[i + child->size];
+    }
 
     // new child holds the second half of the keys
     if (child->is_leaf)
     {
         for (int i = 0; i < t; i++)
         {
-            new_child->keys[i] = child->keys[i + t];
-            new_child->record_values[i] = child->record_values[i + t];
-            child->record_values[i + t] = nullptr;
+            new_child->record_values[i] = child->record_values[i + child->size];
+            child->record_values[i + child->size] = nullptr;
         }
         new_child->next = child->next;
         child->next = new_child;
     }
     else
     {
-        for (int i = 0; i < t; i++)
+        for (int i = 0; i <= t; i++)
         {
-            new_child->keys[i] = child->keys[i + t];
-            new_child->node_values[i] = child->node_values[i + t];
-            child->node_values[i + t] = nullptr;
+            new_child->node_values[i] = child->node_values[i + child->size];
+            child->node_values[i + child->size] = nullptr;
         }
     }
 
-    // update node key and values
+    // update node key and values in current node
     for (int i = this->size; i > index; i--)
     {
         this->keys[i] = this->keys[i - 1];
@@ -276,13 +285,13 @@ std::vector<Record *> BPlusTree::search_range_vector(float left_key, float right
 
 std::pair<BPlusTree::Iterator, BPlusTree::Iterator> BPlusTree::search_range_iter(float left_key, float right_key)
 {
-    return {search_range_begin(left_key, right_key), search_range_end()};
-};
+    return std::make_pair(search_range_begin(left_key, right_key), search_range_end());
+}
 
 void BPlusTree::insert(float key, Record *value)
 {
     Node *root = this->root;
-    if (root->size < this->degree)
+    if (root->size < root->degree)
     {
         root->insert(key, value);
     }
@@ -293,9 +302,36 @@ void BPlusTree::insert(float key, Record *value)
         Node *new_root = new Node(degree, 0);
         new_root->node_values[0] = root;
         new_root->split_child(0);
-
+        this->root = new_root;
+        
         int i = (new_root->keys[0] < key) ? 1 : 0;
         new_root->node_values[i]->insert(key, value);
-        this->root = new_root;
+    }
+};
+
+void BPlusTree::print() const
+{
+    std::vector<Node *> current_level;
+    current_level.push_back(root);
+    while (!current_level.empty())
+    {
+        std::vector<Node *> next_level;
+        for (Node *node : current_level)
+        {
+            for (int i = 0; i < node->size; i++)
+            {
+                std::cout << node->keys[i] << " ";
+            }
+            std::cout << "| ";
+            if (!node->is_leaf)
+            {
+                for (int i = 0; i <= node->size; i++)
+                {
+                    next_level.push_back(node->node_values[i]);
+                }
+            }
+        }
+        std::cout << std::endl;
+        current_level = next_level;
     }
 };

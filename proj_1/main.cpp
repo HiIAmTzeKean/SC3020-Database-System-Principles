@@ -153,9 +153,11 @@ int main() {
     int count = 0;
     for (const auto& record : records) {
         // print the record
-        std::cout << record.pts_home << " " << record.fg_pct_home << " " << record.ft_pct_home << " " << record.fg3_pct_home << " " << record.ast_home << " " << record.reb_home << " " << record.home_team_wins << "\n";
+        std::cout << record.fg_pct_home << " " << record.ft_pct_home << " " << record.fg3_pct_home << " " << record.ast_home << " " << record.reb_home << " " << record.home_team_wins << "\n";
         bptree.insert(record.fg_pct_home, new Record(record));
         std::cout << "Record " << ++count << " inserted into the B+ tree.\n";
+        bptree.print();
+        std::cout << "\n";
     }
 
     std::cout << "Records loaded into the B+ tree successfully.\n";

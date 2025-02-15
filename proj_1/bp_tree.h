@@ -2,9 +2,10 @@
 #define BP_TREE_H
 
 #include <vector>
+#include <utility>
 #include "record.h"
 
-const int KEY_SIZE = 100;
+const int KEY_SIZE = 3;
 
 int ceil_div(int a, int b);
 int floor_div(int a, int b);
@@ -17,16 +18,16 @@ struct Node
     void insert(float key, Record *record);
     void split_child(int index);
 
-    bool is_leaf;
-    int degree;
-    int size; // current number of keys
+    bool is_leaf = 0;
+    int degree = 0;
+    int size = 0; // current number of keys
     float *keys;
     union
     {
         Node **node_values;
         Record **record_values;
     };
-    Node *next;
+    Node *next = nullptr;
 };
 
 class BPlusTree
@@ -59,11 +60,12 @@ public:
     Record *search(float key);
     std::vector<Record *> search_range_vector(float left_key, float right_key);
     void insert(float key, Record *value);
+    void print() const;
 
 private:
-    int degree;
-    int height;
-    int size;
+    int degree = 0;
+    int height = 0;
+    int size = 0;
     Node *root;
 };
 
