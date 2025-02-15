@@ -76,14 +76,14 @@ void Node::insert(float key, Record *record)
         {
             i--;
         }
-        std::cout << "Child node index: " << i + 1 << std::endl;
-        std::cout << "Child node size: " << node_values[i + 1]->size << std::endl;
+        std::cout << "Key identified: " << i << std::endl;
+        std::cout << "Current size: " << size << std::endl;
         // check if child node is full
         if (node_values[i + 1]->size == degree)
         {
             std::cout << "Child node is full. Splitting child node." << std::endl;
             split_child(i + 1);
-            if (keys[i + 1] < key)
+            if (this->keys[i + 1] < key)
             {
                 i++;
             }
@@ -138,7 +138,7 @@ void Node::split_child(int index)
         this->keys[i] = this->keys[i - 1];
         this->node_values[i + 1] = this->node_values[i];
     }
-    this->keys[index] = child->keys[t - 1];
+    this->keys[index] = new_child->keys[0];
     this->node_values[index + 1] = new_child;
     this->size++;
 };
