@@ -4,9 +4,11 @@
 #include <vector>
 
 #include "record.h"
+#include "bp_tree.h"
 
 const int BLOCK_SIZE = 4096;
 
+// TODO change the variable and function naming convention LOL
 struct Block {
     std::vector<Record> records;
     // assume non-spanning records
@@ -58,7 +60,7 @@ std::vector<Record> readRecordsFromFile(const std::string& filename) {
 
     file.close();
     return records;
-}
+};
 
 void writeDatabaseFile(const std::string& filename, const std::vector<Record>& records) {
     std::ofstream file(filename, std::ios::binary);
@@ -91,7 +93,7 @@ void writeDatabaseFile(const std::string& filename, const std::vector<Record>& r
     file.close();
     std::cout << "Database file written successfully.\n";
     std::cout << "Total blocks written: " << totalBlocks << "\n";
-}
+};
 
 void reportStatistics(const std::vector<Record>& records) {
     int recordSize = Record::size();
@@ -103,7 +105,32 @@ void reportStatistics(const std::vector<Record>& records) {
     std::cout << "Total records: " << totalRecords << "\n";
     std::cout << "Records per block: " << recordsPerBlock << "\n";
     std::cout << "Total blocks needed: " << totalBlocks << "\n";
-}
+};
+
+// TODO fix this function corruption during reading
+std::vector<Record> readDatabaseFile(const std::string& filename) {
+    std::vector<Record> records;
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+        std::cerr << "Error opening file for reading.\n";
+        return records;
+    }
+
+    char buffer[BLOCK_SIZE];
+    while (file.read(buffer, BLOCK_SIZE)) {
+        Block block;
+        int offset = 0;
+        while (offset < BLOCK_SIZE) {
+            Record record;
+            std::memcpy(&record, buffer + offset, Record::size());
+            records.push_back(record);
+            offset += Record::size();
+        }
+    }
+
+    file.close();
+    return records;
+};
 
 int main() {
     std::string inputFile = "games.txt";
@@ -119,5 +146,19 @@ int main() {
     std::string outputFile = "nba_database.dat";
     writeDatabaseFile(outputFile, records);
 
+    // Load the binary file and insert records into the B+ tree
+    // std::vector<Record> loadedRecords = readDatabaseFile(outputFile);
+    BPlusTree bptree = BPlusTree(KEY_SIZE);
+
+    int count = 0;
+    for (const auto& record : records) {
+        // print the record
+        std::cout << record.pts_home << " " << record.fg_pct_home << " " << record.ft_pct_home << " " << record.fg3_pct_home << " " << record.ast_home << " " << record.reb_home << " " << record.home_team_wins << "\n";
+        bptree.insert(record.fg_pct_home, new Record(record));
+        std::cout << "Record " << ++count << " inserted into the B+ tree.\n";
+    }
+
+    std::cout << "Records loaded into the B+ tree successfully.\n";
+
     return 0;
-}
+};
