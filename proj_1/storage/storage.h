@@ -1,8 +1,6 @@
 #ifndef STORAGE_H
 #define STORAGE_H
 
-#define BLOCK_SIZE 4096
-
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -10,6 +8,15 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <cstdlib>
+
+#ifdef _WIN32
+#include <Windows.h>
+#elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#else
+#include <cstdio>
+#endif
 
 struct Record {
     uint32_t game_date_est;     // 4 bytes (DDMMYYYY)
@@ -35,12 +42,17 @@ struct Block {
 };
 
 struct Storage {
-    std::vector<Record> readRecordsFromFile(const std::string &filename);
+    static int BlockSize;
+    Storage() {
+        BlockSize = getSystemBlockSizeSetting();
+    };
 
+    std::vector<Record> readRecordsFromFile(const std::string &filename);
     void writeDatabaseFile(const std::string &filename, const std::vector<Record> &records);
     void readDatabaseFile(const std::string &filename, std::vector<Record> &records);
     void reportStatistics(const std::vector<Record> &records);
     void bruteForceScan(std::vector<Record> const &records, float min, float max);
+    int getSystemBlockSizeSetting(void);
 };
 
 #endif  // STORAGE_H

@@ -1,5 +1,7 @@
 #include "storage.h"
 
+int Storage::BlockSize = 0;  
+
 int Record::sizeUnpadded() {
     return sizeof(game_date_est) +
            sizeof(team_id_home) +
@@ -18,7 +20,7 @@ int Record::size() {
 }
 
 int Block::maxRecordsPerBlock() {
-    return BLOCK_SIZE / Record::size();
+    return Storage::BlockSize / Record::size();
 }
 
 // Serialize Block data into a buffer
@@ -96,7 +98,7 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
     }
 
     int maxRecords = Block::maxRecordsPerBlock();
-    char buffer[BLOCK_SIZE];
+    char buffer[Storage::BlockSize];
     Block block;
     int bytesToWrite;
     int totalBlocks = 0;
@@ -106,7 +108,7 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
         block.records.push_back(record);
         if (block.records.size() == maxRecords) {
             block.serialize(buffer, &bytesToWrite);
-            file.write(buffer, BLOCK_SIZE);
+            file.write(buffer, Storage::BlockSize);
             totalBlocks++;
             totalRecords += block.records.size();
             block.records.clear();
@@ -135,15 +137,15 @@ void Storage::readDatabaseFile(const std::string &filename, std::vector<Record> 
         return;
     }
 
-    char buffer[BLOCK_SIZE];
+    char buffer[Storage::BlockSize];
     Block block;
     int blockCount = 0;
     int recordCount = 0;
 
-    while (file.read(buffer, BLOCK_SIZE) || file.gcount()) {
-        int bytesToRead = file.gcount() < BLOCK_SIZE 
+    while (file.read(buffer, Storage::BlockSize) || file.gcount()) {
+        int bytesToRead = file.gcount() < Storage::BlockSize 
             ? file.gcount() // Read partial block 
-            : BLOCK_SIZE;
+            : Storage::BlockSize;
 
         block.deserialize(buffer, records, bytesToRead);
         blockCount++;
@@ -218,4 +220,27 @@ void Storage::bruteForceScan(std::vector<Record> const &records, float min, floa
 
     std::chrono::duration<double> time_taken = end - start;  // Duration in seconds
     std::cout << "Brute-force scan time: " << time_taken.count() << " seconds" << '\n';
+}
+
+// Get the current system's block size (page size) in bytes
+int Storage::getSystemBlockSizeSetting(void) {
+    int block_size;
+    #ifdef _WIN32
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        block_size = si.dwPageSize;
+    #elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
+        long res = sysconf(_SC_PAGESIZE);
+        block_size = res;
+        if (block_size == -1) {
+            block_size = 4096;
+            std::cout << "Failed to get system block size, setting block size to default of 4096 bytes.\n";
+        }
+    #else
+        block_size = 4096;
+        std::cout << "Failed to get system block size, setting block size to default of 4096 bytes.\n";
+    #endif
+
+    std::cout << "System block size: " << block_size << "bytes \n";
+    return block_size;
 }
