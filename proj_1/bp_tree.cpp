@@ -30,7 +30,6 @@ Node::Node(int degree, bool is_leaf) : is_leaf(is_leaf), degree(degree)
     {
         // internal node has degree + 1 pointers
         degree++;
-        this->degree = degree;
         this->node_values = new Node *[degree];
         for (int i = 0; i < degree; i++)
         {
@@ -82,7 +81,7 @@ void Node::insert(float key, Record *record)
             i--;
         }
         std::cout << "Key identified: " << i << std::endl;
-        std::cout << "Current size: " << size << std::endl;
+        std::cout << "Current size: " << node_values[i + 1]->size << std::endl;
         // check if child node is full
         if (node_values[i + 1]->size == node_values[i + 1]->degree)
         {
@@ -303,9 +302,7 @@ void BPlusTree::insert(float key, Record *value)
         new_root->node_values[0] = root;
         new_root->split_child(0);
         this->root = new_root;
-        
-        int i = (new_root->keys[0] < key) ? 1 : 0;
-        new_root->node_values[i]->insert(key, value);
+        new_root->insert(key, value);
     }
 };
 
