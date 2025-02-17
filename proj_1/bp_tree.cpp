@@ -58,6 +58,7 @@ Node::~Node()
 void Node::insert(float key, Record *record)
 {
     int i = this->size - 1;
+    std::cout << "size of current node: " << this->size << std::endl;
     if (this->is_leaf)
     {
         std::cout << "Inserting into leaf node." << std::endl;
@@ -104,7 +105,7 @@ void Node::split_child(int index)
     if (child->is_leaf)
     {
         std::cout << "Splitting leaf node. Degree " << child->degree << std::endl;
-        t = (child->degree + 1) / 2;
+        t = (child->get_child_degree() + 1) / 2;
     }
     else
     {
@@ -301,6 +302,7 @@ void BPlusTree::insert(float key, Record *value)
         Node *new_root = new Node(degree, 0);
         new_root->node_values[0] = root;
         new_root->split_child(0);
+        
         this->root = new_root;
         new_root->insert(key, value);
     }

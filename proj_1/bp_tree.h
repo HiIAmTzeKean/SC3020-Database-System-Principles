@@ -21,7 +21,7 @@ struct Node
     bool is_leaf = 0;
     int degree = 0;
     int size = 0; // current number of keys
-    float *keys;
+    float *keys = nullptr;
 
     union
     {
@@ -75,7 +75,7 @@ private:
     int degree = 0;
     int height = 0;
     int size = 0;
-    Node *root;
+    Node *root = nullptr;
 };
 
 #endif // BP_TREE_H
