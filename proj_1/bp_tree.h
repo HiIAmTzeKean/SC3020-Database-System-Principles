@@ -22,12 +22,21 @@ struct Node
     int degree = 0;
     int size = 0; // current number of keys
     float *keys;
+
     union
     {
         Node **node_values;
         Record **record_values;
     };
+
     Node *next = nullptr;
+
+    int get_child_degree() {
+        if (is_leaf) {
+            return degree;
+        }
+        return degree + 1;
+    };
 };
 
 class BPlusTree

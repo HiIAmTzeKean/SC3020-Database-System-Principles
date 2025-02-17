@@ -64,7 +64,7 @@ void Node::insert(float key, Record *record)
         while (i >= 0 && this->keys[i] > key)
         {
             this->keys[i + 1] = this->keys[i];
-            record_values[i + 1] = record_values[i];
+            this->record_values[i + 1] = this->record_values[i];
             i--;
         }
         this->keys[i + 1] = key;
@@ -83,7 +83,7 @@ void Node::insert(float key, Record *record)
         std::cout << "Key identified: " << i << std::endl;
         std::cout << "Current size: " << node_values[i + 1]->size << std::endl;
         // check if child node is full
-        if (node_values[i + 1]->size == node_values[i + 1]->degree)
+        if (node_values[i + 1]->size == node_values[i + 1]->get_child_degree())
         {
             std::cout << "Child node is full. Splitting child node." << std::endl;
             split_child(i + 1);
@@ -109,9 +109,9 @@ void Node::split_child(int index)
     else
     {
         std::cout << "Splitting internal node. Degree " << child->degree << std::endl;
-        t = child->degree / 2;
+        t = child->get_child_degree() / 2;
     }
-    child->size = child->degree - t;
+    child->size = child->get_child_degree() - t;
     new_child->size = t;
     std::cout << "Size of left and right is " << child->size << " " << new_child->size << std::endl;
 
@@ -290,7 +290,7 @@ std::pair<BPlusTree::Iterator, BPlusTree::Iterator> BPlusTree::search_range_iter
 void BPlusTree::insert(float key, Record *value)
 {
     Node *root = this->root;
-    if (root->size < root->degree)
+    if (root->size < root->get_child_degree())
     {
         root->insert(key, value);
     }
