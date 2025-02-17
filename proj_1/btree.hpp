@@ -25,6 +25,8 @@ public:
   bool is_leaf_node;
 
 private:
+  struct Private;
+
   Iterator search_node(float key) const;
   size_t entry_count() const;
   void set_entry_count(size_t entry_count);
@@ -50,7 +52,7 @@ private:
   BPlusNode *m_parent{nullptr};
   size_t m_key_count{0};
   float m_keys[BPlusTreeN]{0};
-  Entry m_entries[BPlusTreeN + 1]{0};
+  Entry m_entries[BPlusTreeN + 1]{{0}};
 };
 
 // This struct is intended to be used like a normal vector iterator. :)

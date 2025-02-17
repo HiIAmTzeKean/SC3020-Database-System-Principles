@@ -6,11 +6,15 @@ int main() {
   std::cout << "Constructing tree by inserting values from 100 to 0. (25 & 75 "
                "are skipped)"
             << std::endl;
-  for (auto i = 100; i >= 0; --i) {
-    if (i == 25 || i == 75)
-      continue;
-    tree.insert(i, nullptr);
+  for (auto h = 0; h <= 2; ++h) {
+    for (auto i = 100; i >= 0; --i) {
+      if (i == 25 || i == 75)
+        continue;
+      tree.insert(i, nullptr);
+    }
   }
+  tree.print();
+  std::cout << std::endl;
   std::cout << "Doing range search of [0, infinity)" << std::endl;
   for (auto it = tree.search(0); it.is_valid(); ++it) {
     std::cout << it.current_key() << " ";

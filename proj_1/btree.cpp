@@ -36,6 +36,31 @@ BPlusNode::Iterator BPlusNode::first() const {
   return Iterator(current_node, 0);
 }
 
+struct BPlusNode::Private {
+  static size_t first_index_greater_equal(const BPlusNode &node, float key) {
+    auto key_count = node.m_key_count;
+    auto lower_bound =
+        std::lower_bound(node.m_keys, node.m_keys + key_count, key);
+    return lower_bound - node.m_keys;
+  };
+
+  static size_t first_index_greater_than(const BPlusNode &node, float key) {
+    auto key_count = node.m_key_count;
+    auto upper_bound =
+        std::upper_bound(node.m_keys, node.m_keys + key_count, key);
+    return upper_bound - node.m_keys;
+  };
+
+  static void insert_direct(BPlusNode &node, size_t key_index, float key,
+                            Entry entry) {
+    assert(node.m_key_count >= 0 && node.m_key_count < BPlusTreeN);
+    auto entry_index = key_index_to_entry_index(node.is_leaf_node, key_index);
+    unchecked_insert(node.m_keys, node.m_key_count, key_index, key);
+    unchecked_insert(node.m_entries, node.entry_count(), entry_index, entry);
+    ++node.m_key_count;
+  };
+};
+
 // NOTE: search will always return the iterator of where the smallest entry
 // larger or equal to key is but search_node will return where key belongs in
 // the tree.
@@ -47,12 +72,9 @@ BPlusNode::Iterator BPlusNode::search(float key) const {
 BPlusNode::Iterator BPlusNode::search_node(float key) const {
   auto current_node = this;
   while (!current_node->is_leaf_node) {
-    // 1. Find the first element that is larger than the key.
-    auto key_count = current_node->m_key_count;
-    assert(key_count > 0);
-    auto upper_bound = std::upper_bound(current_node->m_keys,
-                                        current_node->m_keys + key_count, key);
-    auto index = upper_bound - current_node->m_keys;
+    // 1. Find the last element that is smaller than the key.
+    assert(current_node->m_key_count > 0);
+    auto index = Private::first_index_greater_equal(*current_node, key);
     // 2. If no such key exists, index will be key_count (last node of the
     //    tree).
     //    If the key exists, we should be looking at the node to the left (same
@@ -62,10 +84,7 @@ BPlusNode::Iterator BPlusNode::search_node(float key) const {
     // 3. Repeat until we are at a leaf node.
   }
   // 4. Search for the key.
-  auto key_count = current_node->m_key_count;
-  auto lower_bound = std::lower_bound(current_node->m_keys,
-                                      current_node->m_keys + key_count, key);
-  auto index = lower_bound - current_node->m_keys;
+  auto index = Private::first_index_greater_equal(*current_node, key);
   return Iterator(current_node, index);
 };
 
@@ -79,8 +98,6 @@ Record *BPlusNode::search_exact(float key) const {
 
 BPlusNode &BPlusNode::insert(float key, Record *record) {
   auto insert_location = search_node(key);
-  // The key should not already exists.
-  assert(!insert_location.is_valid() || insert_location.current_key() != key);
   auto root = this;
   auto target_node = const_cast<BPlusNode *>(insert_location.m_node);
   auto target_key_index = insert_location.m_index;
@@ -92,30 +109,8 @@ BPlusNode &BPlusNode::insert(float key, Record *record) {
         key_index_to_entry_index(target_node->is_leaf_node, target_key_index);
     // 1. Insert at the index if there are empty space.
     if (target_node->m_key_count < BPlusTreeN) {
-      auto entry_count = target_node->is_leaf_node
-                             ? target_node->m_key_count
-                             : target_node->m_key_count + 1;
-      unchecked_insert(target_node->m_keys, target_node->m_key_count,
-                       target_key_index, target_key);
-      unchecked_insert(target_node->m_entries, entry_count, target_entry_index,
-                       target_entry);
-      ++target_node->m_key_count;
-      // Update the parents' key if this insert changed the lower bounds of the
-      // tree.
-      auto affected_field = target_key_index;
-      auto original_key = target_node->m_keys[1];
-      while (target_node->m_parent && affected_field == 0) {
-        target_node = target_node->m_parent;
-        auto lower_bound = std::lower_bound(
-            target_node->m_keys, target_node->m_keys + target_node->m_key_count,
-            original_key);
-        if (*lower_bound != original_key)
-          break;
-        *lower_bound = target_key;
-        // We can bail early if affected_field is not 0 as we know it's not the
-        // smallest subtree in our parent.
-        affected_field = lower_bound - target_node->m_keys;
-      }
+      Private::insert_direct(*target_node, target_key_index, target_key,
+                             target_entry);
       return *root;
     }
     assert(target_node->m_key_count == BPlusTreeN);
@@ -155,20 +150,12 @@ BPlusNode &BPlusNode::insert(float key, Record *record) {
     }
     // 3. Actually insert the value now that we have the space to!
     if (target_entry_index < ceil_div(BPlusTreeN + 1, 2)) {
-      unchecked_insert(target_node->m_keys, target_node->m_key_count,
-                       target_key_index, target_key);
-      unchecked_insert(target_node->m_entries, target_node->entry_count(),
-                       target_entry_index, target_entry);
-      ++target_node->m_key_count;
+      Private::insert_direct(*target_node, target_key_index, target_key,
+                             target_entry);
     } else {
       auto key_index_in_new_node = target_key_index - original_node_entry_count;
-      auto entry_index_in_new_node = key_index_to_entry_index(
-          new_node->is_leaf_node, key_index_in_new_node);
-      unchecked_insert(new_node->m_keys, new_node->m_key_count,
-                       key_index_in_new_node, target_key);
-      unchecked_insert(new_node->m_entries, new_node->entry_count(),
-                       entry_index_in_new_node, target_entry);
-      ++new_node->m_key_count;
+      Private::insert_direct(*new_node, key_index_in_new_node, target_key,
+                             target_entry);
     }
     // 4. Make sure that all nodes have their parents correctly updated.
     if (!new_node->is_leaf_node) {
