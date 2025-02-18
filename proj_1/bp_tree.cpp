@@ -122,19 +122,19 @@ Node* Node::insert(float key, Record *record)
             if (this->size == this->get_child_degree())
             {// overflow
                 std::cout << "Overflow occurred at internal node. Splitting internal node." << std::endl;
-                Node* new_child = split_internal_child(key);
+                Node* new_internal_child = split_internal_child(key);
                 if (this->keys[this->size - 1] < key)
                 {
-                    i = new_child->size - 1;
-                    while (i >= 0 && new_child->keys[i] > key)
+                    i = new_internal_child->size - 1;
+                    while (i >= 0 && new_internal_child->keys[i] > key)
                     {
-                        new_child->keys[i + 1] = new_child->keys[i];
-                        new_child->node_values[i + 1] = new_child->node_values[i];
+                        new_internal_child->keys[i + 1] = new_internal_child->keys[i];
+                        new_internal_child->node_values[i + 1] = new_internal_child->node_values[i];
                         i--;
                     }
-                    new_child->keys[i] = key;
-                    new_child->node_values[i + 1] = new_child;
-                    new_child->size++;
+                    new_internal_child->keys[i] = key;
+                    new_internal_child->node_values[i + 1] = new_child;
+                    new_internal_child->size++;
                 }
                 else
                 {
@@ -149,7 +149,7 @@ Node* Node::insert(float key, Record *record)
                     this->node_values[i + 1] = new_child;
                     this->size++;
                 }
-                return new_child;
+                return new_internal_child;
             }
             else
             {// no overflow
