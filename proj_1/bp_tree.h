@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <utility>
-#include "record.h"
+#include "storage/storage.h"
 
 const int KEY_SIZE = 3;
 
@@ -15,8 +15,10 @@ struct Node
     Node(int degree, bool is_leaf);
     ~Node();
 
-    void insert(float key, Record *record);
-    void split_child(int index);
+    Node* insert(float key, Record *record);
+    Node* split_leaf_child(float key);
+    Node* split_internal_child(float key);
+    Node* split_child(int index, float key);
 
     bool is_leaf = 0;
     int degree = 0;

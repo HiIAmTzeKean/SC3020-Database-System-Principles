@@ -1,4 +1,4 @@
-#include "record.h"
+#include "storage/storage.h"
 #include "bp_tree.h"
 #include <vector>
 #include <iostream>
@@ -55,23 +55,57 @@ Node::~Node()
     }
 };
 
-void Node::insert(float key, Record *record)
+Node* Node::insert(float key, Record *record)
 {
     int i = this->size - 1;
     std::cout << "size of current node: " << this->size << std::endl;
     if (this->is_leaf)
     {
-        std::cout << "Inserting into leaf node." << std::endl;
-        while (i >= 0 && this->keys[i] > key)
-        {
-            this->keys[i + 1] = this->keys[i];
-            this->record_values[i + 1] = this->record_values[i];
-            i--;
+        if (this->size == this->get_child_degree())
+        {// overflow
+            std::cout << "Overflow occurred at leaf node. Splitting leaf node." << std::endl;
+            Node* new_child = split_leaf_child(key);
+            if (this->keys[this->size-1] < key)
+            {
+                i = new_child->size - 1;
+                while (i >= 0 && new_child->keys[i] > key)
+                {
+                    new_child->keys[i + 1] = new_child->keys[i];
+                    new_child->record_values[i + 1] = new_child->record_values[i];
+                    i--;
+                }
+                new_child->keys[i + 1] = key;
+                new_child->record_values[i + 1] = record;
+                new_child->size++;
+            }
+            else
+            {
+                i = this->size - 1;
+                while (i >= 0 && this->keys[i] > key)
+                {
+                    this->keys[i + 1] = this->keys[i];
+                    this->record_values[i + 1] = this->record_values[i];
+                    i--;
+                }
+                this->keys[i + 1] = key;
+                this->record_values[i + 1] = record;
+                this->size++;
+            }
+            return new_child;
         }
-        this->keys[i + 1] = key;
-        this->record_values[i + 1] = record;
-        this->size++;
-        std::cout << "Size is " << this->size << std::endl;
+        else
+        {
+            i = this->size - 1;
+            while (i >= 0 && this->keys[i] > key)
+            {
+                this->keys[i + 1] = this->keys[i];
+                this->record_values[i + 1] = this->record_values[i];
+                i--;
+            }
+            this->keys[i + 1] = key;
+            this->record_values[i + 1] = record;
+            this->size++;
+        }
     }
     else
     {
@@ -81,75 +115,149 @@ void Node::insert(float key, Record *record)
         {
             i--;
         }
-        std::cout << "Key identified: " << i << std::endl;
-        std::cout << "Current size: " << node_values[i + 1]->size << std::endl;
-        // check if child node is full
-        if (node_values[i + 1]->size == node_values[i + 1]->get_child_degree())
+        Node* new_child = node_values[i]->insert(key, record);
+        // insert into current node
+        if (new_child != nullptr)
         {
-            std::cout << "Child node is full. Splitting child node." << std::endl;
-            split_child(i + 1);
-            if (this->keys[i + 1] < key)
-            {
-                i++;
+            if (this->size == this->get_child_degree())
+            {// overflow
+                std::cout << "Overflow occurred at internal node. Splitting internal node." << std::endl;
+                Node* new_child = split_internal_child(key);
+                if (this->keys[this->size - 1] < key)
+                {
+                    i = new_child->size - 1;
+                    while (i >= 0 && new_child->keys[i] > key)
+                    {
+                        new_child->keys[i + 1] = new_child->keys[i];
+                        new_child->node_values[i + 1] = new_child->node_values[i];
+                        i--;
+                    }
+                    new_child->keys[i] = key;
+                    new_child->node_values[i + 1] = new_child;
+                    new_child->size++;
+                }
+                else
+                {
+                    i = this->size - 1;
+                    while (i >= 0 && this->keys[i] > key)
+                    {
+                        this->keys[i + 1] = this->keys[i];
+                        this->node_values[i + 1] = this->node_values[i];
+                        i--;
+                    }
+                    this->keys[i] = key;
+                    this->node_values[i + 1] = new_child;
+                    this->size++;
+                }
+                return new_child;
+            }
+            else
+            {// no overflow
+                i = this->size - 1;
+                while (i >= 0 && this->keys[i] > key)
+                {
+                    this->keys[i + 1] = this->keys[i];
+                    this->node_values[i + 1] = this->node_values[i];
+                    i--;
+                }
+                this->keys[i] = new_child->keys[0];
+                this->node_values[i + 1] = new_child;
+                this->size++;
             }
         }
-        node_values[i + 1]->insert(key, record);
     }
+    return nullptr;
 };
 
-void Node::split_child(int index)
+Node* Node::split_leaf_child(float key)
+{
+    Node *new_child = new Node(this->degree, 1);
+    int t = floor_div(this->degree + 1, 2);
+    this->size -= t;
+    new_child->size = t;
+    int i = 0;
+    if (key > this->keys[this->size + i])
+    {
+        t--;
+        new_child->size--;
+        this->size++;
+    }
+    for (i = 0; i < t; i++)
+    {
+        new_child->keys[i] = this->keys[this->size + i];
+        new_child->record_values[i] = this->record_values[this->size + i];
+        this->record_values[this->size + i] = nullptr;
+    }
+    new_child->next = this->next;
+    this->next = new_child;
+    return new_child;
+};
+
+Node* Node::split_internal_child(float key)
+{
+    Node *new_child = new Node(this->degree, this->is_leaf);
+    int t = 0;
+    std::cout << "Splitting internal node. Degree " << this->degree << std::endl;
+    t = floor_div(this->degree + 2, 2);
+    this->size -= t;
+    new_child->size = t;
+    
+    std::cout << "Size of left and right is " << this->size << " " << new_child->size << std::endl;
+
+    // new this holds the second half of the keys
+    // always asssume that key is inserted on left side
+    // but this might not be the case
+    int i = 0;
+    if (key < this->keys[this->size + i])
+    {
+        t--;
+        new_child->size--;
+        this->size++;
+    }
+    for (i = 0; i < t-1; i++)
+    {
+        new_child->keys[i] = this->keys[this->size + i];
+    }
+    for (int i = 0; i < t; i++)
+    {
+        new_child->node_values[i] = this->node_values[this->size + i];
+        this->node_values[this->size + i] = nullptr;
+    }
+    return new_child;
+};
+
+Node* Node::split_child(int index, float key)
 {
     Node *child = node_values[index];
     Node *new_child = new Node(child->degree, child->is_leaf);
     int t = 0;
-    if (child->is_leaf)
-    {
-        std::cout << "Splitting leaf node. Degree " << child->degree << std::endl;
-        t = (child->get_child_degree() + 1) / 2;
-    }
-    else
-    {
-        std::cout << "Splitting internal node. Degree " << child->degree << std::endl;
-        t = child->get_child_degree() / 2;
-    }
-    child->size = child->get_child_degree() - t;
+    std::cout << "Splitting internal node. Degree " << child->degree << std::endl;
+    t = floor_div(child->degree + 2, 2);
+    child->size -= t;
     new_child->size = t;
+    
     std::cout << "Size of left and right is " << child->size << " " << new_child->size << std::endl;
 
+    // new child holds the second half of the keys
+    // always asssume that key is inserted on left side
+    // but this might not be the case
+    int i = 0;
+    if (key < child->keys[child->size + i])
+    {
+        t--;
+        new_child->size--;
+        child->size++;
+    }
+    for (i = 0; i < t-1; i++)
+    {
+        new_child->keys[i] = child->keys[child->size + i];
+    }
     for (int i = 0; i < t; i++)
     {
-        new_child->keys[i] = child->keys[i + child->size];
+        new_child->node_values[i] = child->node_values[child->size + i];
+        child->node_values[child->size + i] = nullptr;
     }
-
-    // new child holds the second half of the keys
-    if (child->is_leaf)
-    {
-        for (int i = 0; i < t; i++)
-        {
-            new_child->record_values[i] = child->record_values[i + child->size];
-            child->record_values[i + child->size] = nullptr;
-        }
-        new_child->next = child->next;
-        child->next = new_child;
-    }
-    else
-    {
-        for (int i = 0; i <= t; i++)
-        {
-            new_child->node_values[i] = child->node_values[i + child->size];
-            child->node_values[i + child->size] = nullptr;
-        }
-    }
-
-    // update node key and values in current node
-    for (int i = this->size; i > index; i--)
-    {
-        this->keys[i] = this->keys[i - 1];
-        this->node_values[i + 1] = this->node_values[i];
-    }
-    this->keys[index] = new_child->keys[0];
-    this->node_values[index + 1] = new_child;
-    this->size++;
+    return new_child;
 };
 
 BPlusTree::BPlusTree(int degree)
@@ -291,20 +399,15 @@ std::pair<BPlusTree::Iterator, BPlusTree::Iterator> BPlusTree::search_range_iter
 void BPlusTree::insert(float key, Record *value)
 {
     Node *root = this->root;
-    if (root->size < root->get_child_degree())
+    Node* new_child = root->insert(key, value);
+    if (new_child != nullptr)
     {
-        root->insert(key, value);
-    }
-    else
-    {
-        // overflow
-        std::cout << "Overflow occurred at root. Splitting root node." << std::endl;
         Node *new_root = new Node(degree, 0);
         new_root->node_values[0] = root;
-        new_root->split_child(0);
-        
+        new_root->node_values[1] = new_child;
+        new_root->keys[0] = new_child->keys[0];
+        new_root->size = 2;
         this->root = new_root;
-        new_root->insert(key, value);
     }
 };
 
@@ -317,16 +420,38 @@ void BPlusTree::print() const
         std::vector<Node *> next_level;
         for (Node *node : current_level)
         {
-            for (int i = 0; i < node->size; i++)
+            if (node == nullptr)
             {
-                std::cout << node->keys[i] << " ";
+                continue;
             }
-            std::cout << "| ";
-            if (!node->is_leaf)
+            if (node->is_leaf)
             {
-                for (int i = 0; i <= node->size; i++)
+                for (int i = 0; i < node->size; i++)
                 {
-                    next_level.push_back(node->node_values[i]);
+                    std::cout << node->keys[i] << " ";
+                }
+                std::cout << "| ";
+                if (!node->is_leaf)
+                {
+                    for (int i = 0; i < node->size; i++)
+                    {
+                        next_level.push_back(node->node_values[i]);
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < node->size-1; i++)
+                {
+                    std::cout << node->keys[i] << " ";
+                }
+                std::cout << "| ";
+                if (!node->is_leaf)
+                {
+                    for (int i = 0; i < node->size; i++)
+                    {
+                        next_level.push_back(node->node_values[i]);
+                    }
                 }
             }
         }
