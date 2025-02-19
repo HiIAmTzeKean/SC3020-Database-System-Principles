@@ -207,7 +207,7 @@ void Storage::bruteForceScan(std::vector<Record> const &records, float min, floa
         }
 
         if (records[i].fg_pct_home >= min && records[i].fg_pct_home <= max) {
-            sum += records[i].fg3_pct_home;
+            sum += records[i].fg_pct_home;
             filteredRecordCount++;
         }
     }
@@ -218,7 +218,7 @@ void Storage::bruteForceScan(std::vector<Record> const &records, float min, floa
     std::cout << "Number of data blocks accessed: " << blockCount << '\n';
     if (filteredRecordCount > 0) {
         float avg = sum / filteredRecordCount;
-        std::cout << "Average of 'FG3_PCT_home': " << avg << '\n';
+        std::cout << "Average of 'FG_PCT_home': " << avg << '\n';
     }
 
     std::chrono::duration<double> time_taken = end - start; // Duration in seconds
