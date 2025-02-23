@@ -524,4 +524,25 @@ void BPlusTree::print_node(Node *node, int level)
             print_node(node->node_values[i], level + 1);
          }
     }
+};
+
+int BPlusTree::get_height(){
+    Node *current = root;
+    int height = 1;
+    while (!current->is_leaf)
+    {
+        current = current->node_values[0];
+        height++;
+    }
+    return height;
+}
+std::vector<float> BPlusTree::get_root_keys(){
+    std::vector<float> keys;
+    Node *current = root;
+    while (!current->is_leaf)
+    {
+        keys.push_back(current->keys[0]);
+        current = current->node_values[0];
+    }
+    return keys;
 }

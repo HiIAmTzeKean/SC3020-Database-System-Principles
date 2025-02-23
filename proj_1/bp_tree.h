@@ -66,6 +66,8 @@ public:
     void insert(float key, Record *value);
     void print();
     void print_node(Node *node, int level);
+    int get_height();
+    std::vector<float> get_root_keys();
 
 private:
     int degree = 0;
