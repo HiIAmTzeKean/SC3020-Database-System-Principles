@@ -5,7 +5,7 @@
 #include <utility>
 #include "storage/storage.h"
 
-const int KEY_SIZE = 3;
+const int KEY_SIZE = 4;
 
 int ceil_div(int a, int b);
 int floor_div(int a, int b);
@@ -27,7 +27,8 @@ struct Node
     union
     {
         Node **node_values;
-        Record **record_values;
+        // Record **record_values;
+        std::vector<std::vector<Record*>> record_values;
     };
 
     Node *next = nullptr;
@@ -44,7 +45,7 @@ public:
     public:
         Iterator(Node *node, int index, float right_key);
 
-        Record *operator*() const;
+        std::vector<Record *> operator*() const;
         Iterator &operator++();
         bool operator!=(const Iterator &other) const;
 
@@ -60,7 +61,7 @@ public:
 
     int get_index(float key, Node *node);
     Node *search_leaf_node(float key);
-    Record *search(float key);
+    std::vector<Record *> search(float key);
     std::vector<Record *> search_range_vector(float left_key, float right_key);
     void insert(float key, Record *value);
     void print();

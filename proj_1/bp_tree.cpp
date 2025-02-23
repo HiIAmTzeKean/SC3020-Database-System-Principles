@@ -52,11 +52,12 @@ Node::Node(int degree, bool is_leaf) : is_leaf(is_leaf), degree(degree)
     this->keys = new float[degree];
     if (this->is_leaf)
     {
-        this->record_values = new Record *[degree];
-        for (int i = 0; i < degree; i++)
-        {
-            record_values[i] = nullptr;
-        }
+        // this->record_values = new Record *[degree];
+        // for (int i = 0; i < degree; i++)
+        // {
+        //     record_values[i] = nullptr;
+        // }
+        this->record_values.resize(degree);
     }
     else
     {
@@ -76,7 +77,7 @@ Node::~Node()
     delete[] keys;
     if (is_leaf)
     {
-        delete[] record_values;
+        // delete[] record_values;
     }
     else
     {
@@ -92,17 +93,28 @@ std::pair<Node*, float> Node::insert(float key, Record *record)
 {
     if (is_leaf)
     {
+        // check if duplicate key
+        for (int i = 0; i < size; i++)
+        {
+            if (keys[i] == key)
+            {
+                record_values[i].push_back(record);
+                return {nullptr, 0};
+            }
+        }
+
         if (size < degree)
         {
             int i = size - 1;
             while (i >= 0 && keys[i] > key)
             {
                 keys[i + 1] = keys[i];
-                record_values[i + 1] = record_values[i];
+                // record_values[i + 1] = record_values[i];
                 i--;
             }
             keys[i + 1] = key;
-            record_values[i + 1] = record;
+            // record_values[i + 1] = record;
+            record_values.at(i + 1).push_back(record);
             size++;
             return {nullptr, 0};
         }
@@ -165,7 +177,7 @@ Node *Node::split_leaf_child(float key, Record *record)
             sibling->keys[i - split_index] = keys[i];
             sibling->record_values[i - split_index] = record_values[i];
             keys[i] = 0;
-            record_values[i] = nullptr;
+            record_values[i].clear();
         }
         int i = size - split_index - 1;
         while (i >= 0 && sibling->keys[i] > key)
@@ -175,7 +187,8 @@ Node *Node::split_leaf_child(float key, Record *record)
             i--;
         }
         sibling->keys[i + 1] = key;
-        sibling->record_values[i + 1] = record;
+        // sibling->record_values[i + 1] = record;
+        sibling->record_values[i + 1].push_back(record);
         sibling->size = size - split_index + 1;
         size = split_index;
     }
@@ -187,7 +200,7 @@ Node *Node::split_leaf_child(float key, Record *record)
             sibling->keys[i - split_index] = keys[i];
             sibling->record_values[i - split_index] = record_values[i];
             keys[i] = 0;
-            record_values[i] = nullptr;
+            record_values[i].clear();
         }
         // insert into current node
         int i = split_index - 1;
@@ -198,7 +211,8 @@ Node *Node::split_leaf_child(float key, Record *record)
             i--;
         }
         keys[i + 1] = key;
-        record_values[i + 1] = record;
+        // record_values[i + 1] = record;
+        record_values[i + 1].push_back(record);
         sibling->size = size - split_index;
         size = split_index + 1;
     }
@@ -282,11 +296,17 @@ BPlusTree::~BPlusTree()
 };
 
 BPlusTree::Iterator::Iterator(Node *node, int index, float right_key)
-    : current(node), index(index), right_key(right_key) {}
+    : current(node), index(index), right_key(right_key) {};
 
-Record *BPlusTree::Iterator::operator*() const
+std::vector<Record *> BPlusTree::Iterator::operator*() const
 {
-    return current->record_values[index];
+    // return current->record_values[index].front();
+    std::vector<Record *> result;
+    for (Record *record : current->record_values[index])
+    {
+        result.push_back(record);
+    }
+    return result;
 };
 
 BPlusTree::Iterator &BPlusTree::Iterator::operator++()
@@ -296,7 +316,7 @@ BPlusTree::Iterator &BPlusTree::Iterator::operator++()
         return *this;
     }
     index++;
-    if (index >= current->size || current->keys[index] > right_key)
+    if (index >= current->size)
     {
         current = current->next;
         index = 0;
@@ -306,7 +326,7 @@ BPlusTree::Iterator &BPlusTree::Iterator::operator++()
 
 bool BPlusTree::Iterator::operator!=(const Iterator &other) const
 {
-    return current != other.current || index != other.index;
+    return current != other.current && current->keys[index] <= right_key;
 };
 
 BPlusTree::Iterator BPlusTree::search_range_begin(float left_key, float right_key)
@@ -360,18 +380,17 @@ Node *BPlusTree::search_leaf_node(float key)
     return current;
 };
 
-Record *BPlusTree::search(float key)
+std::vector<Record *> BPlusTree::search(float key)
 {
     Node *current = search_leaf_node(key);
     if (current == nullptr)
     {
-        return nullptr;
+        return std::vector<Record *>();
     }
-    // current is a leaf node
     int index = get_index(key, current);
     if (index == -1)
     {
-        return nullptr;
+        return std::vector<Record *>();
     }
     return current->record_values[index];
 };
@@ -389,7 +408,10 @@ std::vector<Record *> BPlusTree::search_range_vector(float left_key, float right
     {
         for (i = 0; i < current->size && current->keys[i] <= right_key; i++)
         {
-            result.push_back(current->record_values[i]);
+            for (Record *record : current->record_values[i])
+            {
+                result.push_back(record);
+            }
         }
         if (current->keys[i] > right_key)
         {
@@ -404,7 +426,7 @@ std::vector<Record *> BPlusTree::search_range_vector(float left_key, float right
 std::pair<BPlusTree::Iterator, BPlusTree::Iterator> BPlusTree::search_range_iter(float left_key, float right_key)
 {
     return std::make_pair(search_range_begin(left_key, right_key), search_range_end());
-}
+};
 
 // void BPlusTree::print()
 // {
@@ -478,16 +500,26 @@ void BPlusTree::print_node(Node *node, int level)
 
     std::cout << "Level " << level << ": ";
 
-    for (int i = 0; i < node->size; ++i)
+    if (node->is_leaf)
     {
-        std::cout << "(" << node->keys[i] << ") ";
+        for (int i = 0; i < node->size; ++i)
+        {
+            std::cout << "(" << node->keys[i] << ") ";
+        }
+    }
+    else
+    {
+        for (int i = 0; i < node->size - 1; ++i)
+        {
+            std::cout << "(" << node->keys[i] << ") ";
+        }
     }
 
     std::cout << "| Size: " << node->size << std::endl;
 
     if (!node->is_leaf)
     {
-         for (int i = 0; i <= node->size; ++i)
+         for (int i = 0; i < node->size; ++i)
          {
             print_node(node->node_values[i], level + 1);
          }
