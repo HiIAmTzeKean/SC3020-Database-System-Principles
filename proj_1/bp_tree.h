@@ -15,14 +15,13 @@ struct Node
     Node(int degree, bool is_leaf);
     ~Node();
 
-    Node* insert(float key, Record *record);
-    Node* split_leaf_child(float key);
-    Node* split_internal_child(float key);
-    Node* split_child(int index, float key);
+    std::pair<Node*, float> insert(float key, Record *record);
+    Node* split_leaf_child(float key, Record *record);
+    Node* split_internal_child(float key, Node *record);
 
     bool is_leaf = 0;
     int degree = 0;
-    int size = 0; // current number of keys
+    int size = 0;
     float *keys = nullptr;
 
     union
@@ -32,13 +31,6 @@ struct Node
     };
 
     Node *next = nullptr;
-
-    int get_child_degree() {
-        if (is_leaf) {
-            return degree;
-        }
-        return degree + 1;
-    };
 };
 
 class BPlusTree
@@ -71,7 +63,8 @@ public:
     Record *search(float key);
     std::vector<Record *> search_range_vector(float left_key, float right_key);
     void insert(float key, Record *value);
-    void print() const;
+    void print();
+    void print_node(Node *node, int level);
 
 private:
     int degree = 0;
