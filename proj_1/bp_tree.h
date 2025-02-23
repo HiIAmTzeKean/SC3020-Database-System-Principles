@@ -43,16 +43,17 @@ public:
     class Iterator
     {
     public:
-        Iterator(Node *node, int index, float right_key);
+        Iterator(Node *node, int index, float right_key, BPlusTree *tree);
 
         std::vector<Record *> operator*() const;
         Iterator &operator++();
         bool operator!=(const Iterator &other) const;
-
+        
     private:
         Node *current;
         int index;
         float right_key;
+        BPlusTree *tree;
     };
 
     Iterator search_range_begin(float left_key, float right_key);
@@ -71,6 +72,9 @@ public:
     int get_number_of_nodes();
     void task_2();
     void task_3();
+
+    int index_block_hit = 0;
+    int data_block_hit = 0;
 
 private:
     int degree = 0;

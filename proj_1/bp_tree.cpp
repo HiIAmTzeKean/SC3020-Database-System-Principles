@@ -299,12 +299,11 @@ BPlusTree::~BPlusTree()
     delete root;
 };
 
-BPlusTree::Iterator::Iterator(Node *node, int index, float right_key)
-    : current(node), index(index), right_key(right_key) {};
+BPlusTree::Iterator::Iterator(Node *node, int index, float right_key, BPlusTree *tree)
+    : current(node), index(index), right_key(right_key), tree(tree)  {};
 
 std::vector<Record *> BPlusTree::Iterator::operator*() const
 {
-    // return current->record_values[index].front();
     std::vector<Record *> result;
     for (Record *record : current->record_values[index])
     {
@@ -322,6 +321,7 @@ BPlusTree::Iterator &BPlusTree::Iterator::operator++()
     index++;
     if (index >= current->size)
     {
+        tree->index_block_hit++;
         current = current->next;
         index = 0;
     }
@@ -338,19 +338,19 @@ BPlusTree::Iterator BPlusTree::search_range_begin(float left_key, float right_ke
     Node *current = search_leaf_node(left_key);
     if (current == nullptr)
     {
-        return Iterator(nullptr, 0, right_key);
+        return Iterator(nullptr, 0, right_key, this);
     }
     int i = 0;
     while (i < current->size && current->keys[i] < left_key)
     {
         i++;
     }
-    return Iterator(current, i, right_key);
+    return Iterator(current, i, right_key, this);
 };
 
 BPlusTree::Iterator BPlusTree::search_range_end()
 {
-    return Iterator(nullptr, 0, 0);
+    return Iterator(nullptr, 0, 0, this);
 };
 
 int BPlusTree::get_index(float key, Node *node)
@@ -372,6 +372,8 @@ Node *BPlusTree::search_leaf_node(float key)
         return nullptr;
     }
     Node *current = root;
+    index_block_hit++; // for root
+
     while (!current->is_leaf)
     {
         int i = 0;
@@ -380,6 +382,7 @@ Node *BPlusTree::search_leaf_node(float key)
             i++;
         }
         current = current->node_values[i];
+        index_block_hit++; // for internal node
     }
     return current;
 };
@@ -594,4 +597,32 @@ void BPlusTree::task_2()
 
     int number_of_nodes = this->get_number_of_nodes();
     std::cout << "Number of nodes: " << number_of_nodes << std::endl;
+};
+void BPlusTree::task_3()
+{
+    float sum = 0;
+    int num_results = 0;
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    auto [begin, end] = this->search_range_iter(0.6, 0.9);
+    for (auto it = begin; it != end; ++it) {
+        std::vector<Record *> records = *it;
+        for (Record *record : records) {
+            sum += record->fg_pct_home;
+            num_results++;
+        }
+        std::cout << std::endl;
+    }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> time_taken = end_time - start_time;
+    std::cout << "B+ Tree scan time: " << time_taken.count() << " seconds" << '\n';
+
+    std::cout << "Number of records found in range: " << num_results << '\n';
+    if (num_results > 0) {
+        float avg = sum / num_results;
+        std::cout << "Average of 'FG_PCT_home': " << avg << '\n';
+    }
+
+    std::cout << "Number of index blocks accessed in tree: " << this->index_block_hit << '\n';
 }
