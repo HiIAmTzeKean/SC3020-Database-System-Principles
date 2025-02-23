@@ -68,11 +68,12 @@ public:
     void print_node(Node *node, int level);
     int get_height();
     std::vector<float> get_root_keys();
+    int get_number_of_nodes();
+    void task_2();
+    void task_3();
 
 private:
     int degree = 0;
-    int height = 0;
-    int size = 0;
     Node *root = nullptr;
 };
 

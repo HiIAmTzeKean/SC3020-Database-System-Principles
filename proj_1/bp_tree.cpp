@@ -46,7 +46,6 @@ void BPlusTree::insert(float key, Record *value)
     }
 };
 
-
 Node::Node(int degree, bool is_leaf) : is_leaf(is_leaf), degree(degree)
 {
     this->keys = new float[degree];
@@ -109,11 +108,12 @@ std::pair<Node*, float> Node::insert(float key, Record *record)
             while (i >= 0 && keys[i] > key)
             {
                 keys[i + 1] = keys[i];
-                // record_values[i + 1] = record_values[i];
+                record_values[i + 1] = record_values[i];
                 i--;
             }
             keys[i + 1] = key;
             // record_values[i + 1] = record;
+            record_values.at(i + 1).clear();
             record_values.at(i + 1).push_back(record);
             size++;
             return {nullptr, 0};
@@ -184,10 +184,12 @@ Node *Node::split_leaf_child(float key, Record *record)
         {
             sibling->keys[i + 1] = sibling->keys[i];
             sibling->record_values[i + 1] = sibling->record_values[i];
+            sibling->record_values[i].clear();
             i--;
         }
         sibling->keys[i + 1] = key;
         // sibling->record_values[i + 1] = record;
+        sibling->record_values[i + 1].clear();
         sibling->record_values[i + 1].push_back(record);
         sibling->size = size - split_index + 1;
         size = split_index;
@@ -208,10 +210,12 @@ Node *Node::split_leaf_child(float key, Record *record)
         {
             keys[i + 1] = keys[i];
             record_values[i + 1] = record_values[i];
+            record_values[i].clear();
             i--;
         }
         keys[i + 1] = key;
         // record_values[i + 1] = record;
+        record_values[i + 1].clear();
         record_values[i + 1].push_back(record);
         sibling->size = size - split_index;
         size = split_index + 1;
@@ -428,68 +432,68 @@ std::pair<BPlusTree::Iterator, BPlusTree::Iterator> BPlusTree::search_range_iter
     return std::make_pair(search_range_begin(left_key, right_key), search_range_end());
 };
 
-// void BPlusTree::print()
-// {
-//     if (root)
-//     {
-//         print_node(root, 0);
-//     }
-// };
-
 void BPlusTree::print()
 {
-    int count = 0;
-    std::vector<Node *> current_level;
-    current_level.push_back(root);
-    while (!current_level.empty())
+    if (root)
     {
-        std::vector<Node *> next_level;
-        for (Node *node : current_level)
-        {
-            if (node == nullptr)
-            {
-                continue;
-            }
-            if (node->is_leaf)
-            {
-                for (int i = 0; i < node->size; i++)
-                {
-                    std::cout << node->keys[i] << " ";
-                }
-                std::cout << "| ";
-                if (!node->is_leaf)
-                {
-                    for (int i = 0; i < node->size; i++)
-                    {
-                        next_level.push_back(node->node_values[i]);
-                    }
-                }
-            }
-            else
-            {
-                for (int i = 0; i < node->size - 1; i++)
-                {
-                    std::cout << node->keys[i] << " ";
-                }
-                std::cout << "| ";
-                if (!node->is_leaf)
-                {
-                    for (int i = 0; i < node->size; i++)
-                    {
-                        next_level.push_back(node->node_values[i]);
-                    }
-                }
-            }
-        }
-        std::cout << std::endl;
-        current_level = next_level;
-        count += 1;
-        if (count > 10)
-        {
-            break;
-        };
+        print_node(root, 0);
     }
 };
+
+// void BPlusTree::print()
+// {
+//     int count = 0;
+//     std::vector<Node *> current_level;
+//     current_level.push_back(root);
+//     while (!current_level.empty())
+//     {
+//         std::vector<Node *> next_level;
+//         for (Node *node : current_level)
+//         {
+//             if (node == nullptr)
+//             {
+//                 continue;
+//             }
+//             if (node->is_leaf)
+//             {
+//                 for (int i = 0; i < node->size; i++)
+//                 {
+//                     std::cout << node->keys[i] << " ";
+//                 }
+//                 std::cout << "| ";
+//                 if (!node->is_leaf)
+//                 {
+//                     for (int i = 0; i < node->size; i++)
+//                     {
+//                         next_level.push_back(node->node_values[i]);
+//                     }
+//                 }
+//             }
+//             else
+//             {
+//                 for (int i = 0; i < node->size - 1; i++)
+//                 {
+//                     std::cout << node->keys[i] << " ";
+//                 }
+//                 std::cout << "| ";
+//                 if (!node->is_leaf)
+//                 {
+//                     for (int i = 0; i < node->size; i++)
+//                     {
+//                         next_level.push_back(node->node_values[i]);
+//                     }
+//                 }
+//             }
+//         }
+//         std::cout << std::endl;
+//         current_level = next_level;
+//         count += 1;
+//         if (count > 10)
+//         {
+//             break;
+//         };
+//     }
+// };
 
 void BPlusTree::print_node(Node *node, int level)
 {
@@ -535,7 +539,7 @@ int BPlusTree::get_height(){
         height++;
     }
     return height;
-}
+};
 std::vector<float> BPlusTree::get_root_keys(){
     std::vector<float> keys;
     Node *current = root;
@@ -545,4 +549,49 @@ std::vector<float> BPlusTree::get_root_keys(){
         current = current->node_values[0];
     }
     return keys;
+};
+int BPlusTree::get_number_of_nodes(){
+    int count = 0;
+    std::vector<Node *> current_level;
+    current_level.push_back(root);
+    while (!current_level.empty())
+    {
+        std::vector<Node *> next_level;
+        for (Node *node : current_level)
+        {
+            if (node == nullptr)
+            {
+                continue;
+            }
+            count++;
+            if (!node->is_leaf)
+            {
+                for (int i = 0; i < node->size; i++)
+                {
+                    next_level.push_back(node->node_values[i]);
+                }
+            }
+        }
+        current_level = next_level;
+    }
+    return count;
+};
+
+void BPlusTree::task_2()
+{
+    int height = this->get_height();
+    std::cout << "Height: " << height << std::endl;
+
+    std::vector<float> keys = this->get_root_keys();
+    std::cout << "Root keys: [";
+    for (size_t i = 0; i < keys.size(); ++i) {
+        std::cout << keys[i];
+        if (i < keys.size() - 1) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << "]" << std::endl;
+
+    int number_of_nodes = this->get_number_of_nodes();
+    std::cout << "Number of nodes: " << number_of_nodes << std::endl;
 }
