@@ -1,6 +1,7 @@
 #include "record.h"
 #include <algorithm>
 #include <stddef.h>
+#include <vector>
 
 constexpr int BPlusTreeN = 8;
 
@@ -33,7 +34,7 @@ private:
 
   union Entry {
     BPlusNode *node;
-    Record *record;
+    std::vector<Record *> *record;
   };
 
   BPlusNode(bool is_leaf_node, Entry entries[BPlusTreeN + 1])
@@ -47,7 +48,7 @@ private:
   // Leaf nodes.
   BPlusNode *next_ptr() const;
   void set_next_ptr(BPlusNode *ptr);
-  Record *record(size_t index) const;
+  std::vector<Record *> *record(size_t index) const;
 
   BPlusNode *m_parent{nullptr};
   size_t m_key_count{0};
@@ -61,13 +62,13 @@ private:
 struct BPlusNode::Iterator {
 public:
   Iterator(const BPlusNode *node, size_t index)
-      : m_node(node), m_index(index) {};
+      : m_node(node), m_index(index), m_node_index(0) {};
 
   bool is_valid() const;
   float current_key() const;
   Iterator &canonical();
 
-  Record *record() const { return m_node->record(m_index); };
+  Record *record() const { return m_node->record(m_index)->at(m_node_index); };
   Record &operator*() const { return *record(); };
   Record &operator->() const { return *record(); };
   Iterator &operator++();
@@ -88,6 +89,7 @@ private:
 
   const BPlusNode *m_node;
   size_t m_index;
+  size_t m_node_index;
 };
 
 class BPlusTree {

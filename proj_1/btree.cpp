@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <iostream>
+#include <vector>
 
 namespace {
 template <typename T>
@@ -74,7 +75,7 @@ BPlusNode::Iterator BPlusNode::search_node(float key) const {
   while (!current_node->is_leaf_node) {
     // 1. Find the last element that is smaller than the key.
     assert(current_node->m_key_count > 0);
-    auto index = Private::first_index_greater_equal(*current_node, key);
+    auto index = Private::first_index_greater_than(*current_node, key);
     // 2. If no such key exists, index will be key_count (last node of the
     //    tree).
     //    If the key exists, we should be looking at the node to the left (same
@@ -100,9 +101,16 @@ BPlusNode &BPlusNode::insert(float key, Record *record) {
   auto insert_location = search_node(key);
   auto root = this;
   auto target_node = const_cast<BPlusNode *>(insert_location.m_node);
+  if (insert_location.is_valid() && insert_location.current_key() == key) {
+    // Insert directly if we already have a record.
+    target_node->record(insert_location.m_index)->push_back(record);
+    return *root;
+  }
   auto target_key_index = insert_location.m_index;
   auto target_key = key;
-  auto target_entry = Entry{.record = record};
+  auto insert_vector = new std::vector<Record *>();
+  insert_vector->push_back(record);
+  auto target_entry = Entry{.record = insert_vector};
   assert(target_node);
   while (true) {
     auto target_entry_index =
@@ -193,7 +201,10 @@ void BPlusNode::print() const {
   std::cout << "[";
   if (is_leaf_node) {
     for (auto i = 0; i < entry_count(); i++) {
-      std::cout << m_keys[i] << " ";
+      std::cout << m_keys[i];
+      if (record(i)->size() != 1)
+        std::cout << "*" << record(i)->size();
+      std::cout << " ";
     }
     std::cout << "] ";
     return;
@@ -240,7 +251,7 @@ inline void BPlusNode::set_next_ptr(BPlusNode *ptr) {
   m_entries[BPlusTreeN].node = ptr;
 }
 
-inline Record *BPlusNode::record(size_t index) const {
+inline std::vector<Record *> *BPlusNode::record(size_t index) const {
   assert(is_leaf_node);
   assert(index >= 0 && index < entry_count());
   return m_entries[index].record;
@@ -248,7 +259,8 @@ inline Record *BPlusNode::record(size_t index) const {
 
 bool BPlusNode::Iterator::is_valid() const {
   return this->m_node && this->m_node->is_leaf_node &&
-         this->m_index < this->m_node->entry_count();
+         this->m_index < this->m_node->entry_count() &&
+         this->m_node_index < this->m_node->record(m_index)->size();
 };
 
 float BPlusNode::Iterator::current_key() const {
@@ -270,7 +282,12 @@ BPlusNode::Iterator &BPlusNode::Iterator::canonical() {
 
 BPlusNode::Iterator &BPlusNode::Iterator::operator++() {
   assert(is_valid());
-  this->m_index++;
+  ++this->m_node_index;
+  if (this->m_node_index < this->m_node->record(m_index)->size())
+    return *this;
+  // Go to the next record in the leaf node.
+  ++this->m_index;
+  this->m_node_index = 0;
   if (this->m_index < this->m_node->entry_count())
     return *this;
   // Go to the next node.
