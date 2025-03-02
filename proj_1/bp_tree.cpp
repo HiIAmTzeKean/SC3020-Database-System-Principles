@@ -127,7 +127,7 @@ std::pair<Node*, float> Node::insert(float key, Record *record)
     else
     {
         int i = 0;
-        while (i < size - 1 && keys[i] < key)
+        while (i < size - 1 && keys[i] <= key)
         {
             i++;
         }
@@ -545,11 +545,9 @@ int BPlusTree::get_height(){
 };
 std::vector<float> BPlusTree::get_root_keys(){
     std::vector<float> keys;
-    Node *current = root;
-    while (!current->is_leaf)
+    for (int i = 0; i < root->size - 1; i++)
     {
-        keys.push_back(current->keys[0]);
-        current = current->node_values[0];
+        keys.push_back(root->keys[i]);
     }
     return keys;
 };
@@ -610,8 +608,8 @@ void BPlusTree::task_3()
         for (Record *record : records) {
             sum += record->fg_pct_home;
             num_results++;
+            // std::cout << record->fg_pct_home << std::endl;
         }
-        std::cout << std::endl;
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();
