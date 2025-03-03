@@ -10,8 +10,8 @@ int main() {
         return 1;
     }
 
-    // std::string outputFile = "nba_database.dat";
-    // storage.writeDatabaseFile(outputFile, records);
+    std::string outputFile = "data/block_";
+    storage.writeDatabaseFile(outputFile, records);
 
     // std::vector<Record> loadedRecords;
     // storage.readDatabaseFile(outputFile, loadedRecords);
@@ -23,16 +23,21 @@ int main() {
     // // Brute-force linear scan
     // storage.bruteForceScan(records, 0.6, 0.9);
 
-    int num_records = 0;
-    BPlusTree tree = BPlusTree(5);
-    for (Record &record : records) {
-        tree.insert(record.fg_pct_home, &record);
-        num_records++;
-    };
-    std::cout << "Number of records: " << num_records << std::endl;
+    // int num_records = 0;
+    // BPlusTree tree = BPlusTree(5);
+    // for (Record &record : records) {
+    //     // if (record.fg_pct_home == 0.6f) {
+    //     //     std::cout << "hit" << std::endl;
+    //     // }
+    //     tree.insert(record.fg_pct_home, &record);
+    //     num_records++;
+    // };
+    // std::cout << "Number of records: " << num_records << std::endl;
 
+    // tree.task_2();
+    // tree.task_3();
     // int number_of_target = 0;
-    // std::vector<Record*> searchResults = tree.search(0.422);
+    // std::vector<Record*> searchResults = tree.search(0.6f);
     // for (Record* r : searchResults) {
     //     std::cout << r->fg_pct_home << " " << r->ft_pct_home << std::endl;
     //     number_of_target++;

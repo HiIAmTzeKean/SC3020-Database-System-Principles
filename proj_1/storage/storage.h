@@ -35,6 +35,7 @@ struct Record {
 
 struct Block {
     std::vector<Record> records;
+    uint16_t id = 0;
 
     static int maxRecordsPerBlock();
 

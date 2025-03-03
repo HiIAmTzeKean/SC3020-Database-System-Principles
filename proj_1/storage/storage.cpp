@@ -26,6 +26,12 @@ int Block::maxRecordsPerBlock() {
 // Serialize Block data into a buffer
 void Block::serialize(char *buffer, int *bytesToWrite) {
     int offset = 0;
+
+    // Serialize the block id
+    std::memcpy(buffer + offset, &id, sizeof(id));
+    offset += sizeof(id);
+
+    // Serialize the records
     for (const auto &record: records) {
         std::memcpy(buffer + offset, &record, Record::size());
         offset += Record::size();
@@ -35,6 +41,11 @@ void Block::serialize(char *buffer, int *bytesToWrite) {
 
 void Block::deserialize(char *buffer, std::vector<Record> &records, int bytesToRead) {
     int offset = 0;
+    // Deserialize the block id
+    std::memcpy(&id, buffer + offset, sizeof(id));
+    offset += sizeof(id);
+
+    // Deserialize the records
     while (offset + Record::size() <= bytesToRead) {
         Record record;
         std::memcpy(&record, buffer + offset, Record::size());
@@ -94,12 +105,6 @@ std::vector<Record> Storage::readRecordsFromFile(const std::string &filename) {
 }
 
 void Storage::writeDatabaseFile(const std::string &filename, const std::vector<Record> &records) {
-    std::ofstream file(filename, std::ios::binary);
-    if (!file) {
-        std::cerr << "Error opening file for writing.\n";
-        return;
-    }
-
     int maxRecords = Block::maxRecordsPerBlock();
     char buffer[BlockSize];
     Block block;
@@ -110,8 +115,17 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
     for (const auto &record: records) {
         block.records.push_back(record);
         if (block.records.size() == maxRecords) {
+            block.id = totalBlocks;
             block.serialize(buffer, &bytesToWrite);
+            std::string blockFilename = filename + std::to_string(block.id) + ".dat";
+            std::cout << "Writing block " << blockFilename << "\n";
+            std::ofstream file(filename, std::ios::binary);
+            if (!file) {
+                std::cerr << "Error opening file for writing.\n";
+                return;
+            }
             file.write(buffer, BlockSize);
+            file.close();
             totalBlocks++;
             totalRecords += block.records.size();
             block.records.clear();
@@ -120,13 +134,20 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
 
     // Serialize partial block
     if (!block.records.empty()) {
+        block.id = totalBlocks;
         block.serialize(buffer, &bytesToWrite);
+        std::string blockFilename = filename + std::to_string(block.id) + ".dat";
+        std::ofstream file(filename, std::ios::binary);
+        if (!file) {
+            std::cerr << "Error opening file for writing.\n";
+            return;
+        }
         file.write(buffer, bytesToWrite); // Write only the used portion of the block
+        file.close();
         totalBlocks++;
         totalRecords += block.records.size();
         block.records.clear();
     }
-    file.close();
 
     std::cout << "Database file written successfully.\n";
     std::cout << "Total blocks written: " << totalBlocks << "\n";
@@ -152,28 +173,6 @@ void Storage::readDatabaseFile(const std::string &filename, std::vector<Record> 
         block.deserialize(buffer, records, bytesToRead);
         blockCount++;
     }
-
-    //// TODO: remove after done with testing. outputs a .txt file that can be diff-ed with original "games.txt" 
-    // std::ofstream debugFile("debug_games.txt");
-    // for (auto& record : records) {
-    //     uint32_t date = record.game_date_est;
-    //     int day = date / 1000000;
-    //     int month = (date / 10000) % 100;
-    //     int year = date % 10000; 
-    //     char game_date_est[11];  // "DD/MM/YYYY\0"
-    //     snprintf(game_date_est, sizeof(game_date_est), "%d/%d/%d", day, month, year);
-
-    //     debugFile << game_date_est << "\t"
-    //              << record.team_id_home << "\t"
-    //              << record.pts_home << "\t"
-    //              << record.fg_pct_home << "\t"
-    //              << record.ft_pct_home << "\t"
-    //              << record.fg3_pct_home << "\t"
-    //              << record.ast_home << "\t"
-    //              << record.reb_home << "\t"
-    //              << record.home_team_wins << "\n";
-    // }
-    // debugFile.close();
     file.close();
 
     std::cout << "Database file read successfully.\n";
