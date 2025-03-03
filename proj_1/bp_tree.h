@@ -10,13 +10,20 @@ const int KEY_SIZE = 4;
 int ceil_div(int a, int b);
 int floor_div(int a, int b);
 
+struct RecordPointer
+{
+    float key;
+    int offset;
+    int block_id;
+};
+
 struct Node
 {
     Node(int degree, bool is_leaf);
     ~Node();
 
-    std::pair<Node*, float> insert(float key, Record *record);
-    Node* split_leaf_child(float key, Record *record);
+    std::pair<Node*, float> insert(float key, RecordPointer *record);
+    Node* split_leaf_child(float key, RecordPointer *record);
     Node* split_internal_child(float key, Node *record);
 
     bool is_leaf = 0;
@@ -27,8 +34,7 @@ struct Node
     union
     {
         Node **node_values;
-        // Record **record_values;
-        std::vector<std::vector<Record*>> record_values;
+        std::vector<std::vector<RecordPointer*>> record_values;
     };
 
     Node *next = nullptr;
@@ -64,7 +70,7 @@ public:
     Node *search_leaf_node(float key);
     std::vector<Record *> search(float key);
     std::vector<Record *> search_range_vector(float left_key, float right_key);
-    void insert(float key, Record *value);
+    void insert(float key, RecordPointer *value);
     void print();
     void print_node(Node *node, int level);
     int get_height();
@@ -75,6 +81,7 @@ public:
 
     int index_block_hit = 0;
     int data_block_hit = 0;
+    Storage *storage = nullptr;
 
 private:
     int degree = 0;

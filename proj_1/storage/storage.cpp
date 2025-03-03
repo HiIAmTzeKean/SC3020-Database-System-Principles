@@ -39,7 +39,7 @@ void Block::serialize(char *buffer, int *bytesToWrite) {
     *bytesToWrite = offset;
 }
 
-void Block::deserialize(char *buffer, std::vector<Record> &records, int bytesToRead) {
+void Block::deserialize(char *buffer, int bytesToRead) {
     int offset = 0;
     // Deserialize the block id
     std::memcpy(&id, buffer + offset, sizeof(id));
@@ -118,7 +118,6 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
             block.id = totalBlocks;
             block.serialize(buffer, &bytesToWrite);
             std::string blockFilename = filename + std::to_string(block.id) + ".dat";
-            std::cout << "Writing block " << blockFilename << "\n";
             std::ofstream file(blockFilename, std::ios::binary);
             if (!file) {
                 std::cerr << "Error opening file for writing.\n";
@@ -154,44 +153,36 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
     std::cout << "Total records written: " << totalRecords << "\n";
 }
 
-void Storage::readDatabaseFile(const std::string &filename, std::vector<Record> &records) {
+Block Storage::readDatabaseFile(const std::string &filename) {
     std::ifstream file(filename, std::ios::binary);
     if (!file) {
-        std::cerr << "Error opening file for reading.\n";
-        return;
+        throw std::runtime_error("Error opening file for reading.");
     }
 
     char buffer[BlockSize];
     Block block;
-    int blockCount = 0;
 
     while (file.read(buffer, BlockSize) || file.gcount()) {
         int bytesToRead = file.gcount() < BlockSize
                               ? file.gcount() // Read partial block
                               : BlockSize;
-
-        block.deserialize(buffer, records, bytesToRead);
-        blockCount++;
+        block.deserialize(buffer, bytesToRead);
     }
+    number_of_records += block.records.size();
+    loaded_blocks.push_back(block.id);
     file.close();
-
-    std::cout << "Database file read successfully.\n";
-    std::cout << "Total blocks read: " << blockCount << "\n";
-    std::cout << "Total records read: " << records.size() << "\n";
+    return block;
 }
 
-void Storage::reportStatistics(const std::vector<Record> &records) {
-    int totalRecords = records.size();
+void Storage::reportStatistics() {
     int recordsPerBlock = Block::maxRecordsPerBlock();
-    int totalBlocks = (totalRecords + recordsPerBlock - 1) / recordsPerBlock;
-
 
     std::cout << "\nTask 1: Storage" << "\n";
     std::cout << "Record size: " << Record::size() << " bytes (" << Record::sizeUnpadded() <<
             " bytes without padding)\n";
-    std::cout << "Number of Records: " << totalRecords << "\n";
+    std::cout << "Number of Records: " << number_of_records << "\n";
     std::cout << "Number of Records per Block: " << recordsPerBlock << "\n";
-    std::cout << "Number of Blocks: " << totalBlocks << "\n";
+    std::cout << "Number of Blocks: " << loaded_blocks.size() << "\n";
 }
 
 void Storage::bruteForceScan(std::vector<Record> const &records, float min, float max) {

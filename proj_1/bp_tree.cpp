@@ -14,7 +14,7 @@ int floor_div(int a, int b)
     return a / b;
 };
 
-void BPlusTree::insert(float key, Record *value)
+void BPlusTree::insert(float key, RecordPointer *value)
 {
     if (root-> is_leaf)
     {
@@ -51,11 +51,6 @@ Node::Node(int degree, bool is_leaf) : is_leaf(is_leaf), degree(degree)
     this->keys = new float[degree];
     if (this->is_leaf)
     {
-        // this->record_values = new Record *[degree];
-        // for (int i = 0; i < degree; i++)
-        // {
-        //     record_values[i] = nullptr;
-        // }
         this->record_values.resize(degree);
     }
     else
@@ -88,7 +83,7 @@ Node::~Node()
     }
 };
 
-std::pair<Node*, float> Node::insert(float key, Record *record)
+std::pair<Node*, float> Node::insert(float key, RecordPointer *record)
 {
     if (is_leaf)
     {
@@ -166,7 +161,7 @@ std::pair<Node*, float> Node::insert(float key, Record *record)
     }
 };
 
-Node *Node::split_leaf_child(float key, Record *record)
+Node *Node::split_leaf_child(float key, RecordPointer *record)
 {
     Node *sibling = new Node(degree, this->is_leaf);
     int split_index = ceil_div(degree+1, 2);
@@ -302,10 +297,10 @@ BPlusTree::~BPlusTree()
 BPlusTree::Iterator::Iterator(Node *node, int index, float right_key, BPlusTree *tree)
     : current(node), index(index), right_key(right_key), tree(tree)  {};
 
-std::vector<Record *> BPlusTree::Iterator::operator*() const
+std::vector<RecordPointer *> BPlusTree::Iterator::operator*() const
 {
-    std::vector<Record *> result;
-    for (Record *record : current->record_values[index])
+    std::vector<RecordPointer *> result;
+    for (RecordPointer *record : current->record_values[index])
     {
         result.push_back(record);
     }
@@ -399,12 +394,21 @@ std::vector<Record *> BPlusTree::search(float key)
     {
         return std::vector<Record *>();
     }
-    return current->record_values[index];
+    std::vector<RecordPointer*> record_pointers = current->record_values[index];
+    for (RecordPointer *record_pointer : record_pointers)
+    {
+        if (record_pointer.block_id not in stoage.loaded_blocks)
+        {
+            storage.readDatabaseFile("data/block_" + std::to_string(record_pointer.block_id) + ".dat");
+        };
+    };
+    return storage.blocks[record_pointer.block_id].records[record_pointer.offset];
+    // return current->record_values[index];
 };
 
 std::vector<Record *> BPlusTree::search_range_vector(float left_key, float right_key)
 {
-    std::vector<Record *> result;
+    std::vector<RecordPointer *> result;
     Node *current = search_leaf_node(left_key);
     if (current == nullptr)
     {
@@ -415,7 +419,7 @@ std::vector<Record *> BPlusTree::search_range_vector(float left_key, float right
     {
         for (i = 0; i < current->size && current->keys[i] <= right_key; i++)
         {
-            for (Record *record : current->record_values[i])
+            for (RecordPointer *record : current->record_values[i])
             {
                 result.push_back(record);
             }
@@ -608,7 +612,6 @@ void BPlusTree::task_3()
         for (Record *record : records) {
             sum += record->fg_pct_home;
             num_results++;
-            // std::cout << record->fg_pct_home << std::endl;
         }
     }
 

@@ -41,11 +41,14 @@ struct Block {
 
     void serialize(char *buffer, int *bytesToWrite);
 
-    void deserialize(char *buffer, std::vector<Record> &records, int bytesToRead);
+    void deserialize(char *buffer, int bytesToRead);
 };
 
 struct Storage {
     static int BlockSize;
+    int number_of_records = 0;
+    std::vector<int> loaded_blocks;
+    std::vector<Block> blocks;
 
     Storage() {
         BlockSize = getSystemBlockSizeSetting();
@@ -55,9 +58,9 @@ struct Storage {
 
     void writeDatabaseFile(const std::string &filename, const std::vector<Record> &records);
 
-    void readDatabaseFile(const std::string &filename, std::vector<Record> &records);
+    Block readDatabaseFile(const std::string &filename);
 
-    void reportStatistics(const std::vector<Record> &records);
+    void reportStatistics();
 
     void bruteForceScan(std::vector<Record> const &records, float min, float max);
 
