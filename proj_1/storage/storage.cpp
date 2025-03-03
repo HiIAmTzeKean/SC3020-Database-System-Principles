@@ -170,6 +170,7 @@ Block Storage::readDatabaseFile(const std::string &filename) {
     }
     number_of_records += block.records.size();
     loaded_blocks.push_back(block.id);
+    blocks.push_back(block);
     file.close();
     return block;
 }

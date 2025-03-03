@@ -69,7 +69,6 @@ public:
     int get_index(float key, Node *node);
     Node *search_leaf_node(float key);
     std::vector<Record *> search(float key);
-    std::vector<Record *> search_range_vector(float left_key, float right_key);
     void insert(float key, RecordPointer *value);
     void print();
     void print_node(Node *node, int level);

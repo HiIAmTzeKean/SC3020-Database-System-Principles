@@ -297,12 +297,17 @@ BPlusTree::~BPlusTree()
 BPlusTree::Iterator::Iterator(Node *node, int index, float right_key, BPlusTree *tree)
     : current(node), index(index), right_key(right_key), tree(tree)  {};
 
-std::vector<RecordPointer *> BPlusTree::Iterator::operator*() const
+std::vector<Record *> BPlusTree::Iterator::operator*() const
 {
-    std::vector<RecordPointer *> result;
-    for (RecordPointer *record : current->record_values[index])
-    {
-        result.push_back(record);
+    std::vector<Record *> result;
+
+    for (RecordPointer *record_pointer : current->record_values[index]) {
+        auto it = std::find(tree->storage->loaded_blocks.begin(), tree->storage->loaded_blocks.end(), record_pointer->block_id);
+        if (it == tree->storage->loaded_blocks.end()) {
+            tree->storage->readDatabaseFile("data/block_" + std::to_string(record_pointer->block_id) + ".dat");
+        }
+        int block_index = std::distance(tree->storage->loaded_blocks.begin(), it);
+        result.push_back(&tree->storage->blocks[block_index].records[record_pointer->offset]);
     }
     return result;
 };
@@ -394,43 +399,18 @@ std::vector<Record *> BPlusTree::search(float key)
     {
         return std::vector<Record *>();
     }
-    std::vector<RecordPointer*> record_pointers = current->record_values[index];
-    for (RecordPointer *record_pointer : record_pointers)
-    {
-        if (record_pointer.block_id not in stoage.loaded_blocks)
-        {
-            storage.readDatabaseFile("data/block_" + std::to_string(record_pointer.block_id) + ".dat");
-        };
-    };
-    return storage.blocks[record_pointer.block_id].records[record_pointer.offset];
-    // return current->record_values[index];
-};
 
-std::vector<Record *> BPlusTree::search_range_vector(float left_key, float right_key)
-{
-    std::vector<RecordPointer *> result;
-    Node *current = search_leaf_node(left_key);
-    if (current == nullptr)
-    {
-        return result;
-    }
-    int i = 0;
-    while (current != nullptr)
-    {
-        for (i = 0; i < current->size && current->keys[i] <= right_key; i++)
-        {
-            for (RecordPointer *record : current->record_values[i])
-            {
-                result.push_back(record);
-            }
+    std::vector<Record *> result;
+
+    for (RecordPointer *record_pointer : current->record_values[index]) {
+        auto it = std::find(storage->loaded_blocks.begin(), storage->loaded_blocks.end(), record_pointer->block_id);
+        if (it == storage->loaded_blocks.end()) {
+            storage->readDatabaseFile("data/block_" + std::to_string(record_pointer->block_id) + ".dat");
         }
-        if (current->keys[i] > right_key)
-        {
-            break;
-        }
-        current = current->next;
-        i = 0;
+        int block_index = std::distance(storage->loaded_blocks.begin(), it);
+        result.push_back(&storage->blocks[block_index].records[record_pointer->offset]);
     }
+
     return result;
 };
 
@@ -626,4 +606,5 @@ void BPlusTree::task_3()
     }
 
     std::cout << "Number of index blocks accessed in tree: " << this->index_block_hit << '\n';
+    std::cout << "Number of data blocks accessed in tree: " << this->storage->blocks.size() << '\n';
 }

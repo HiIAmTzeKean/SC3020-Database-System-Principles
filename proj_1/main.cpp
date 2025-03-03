@@ -31,9 +31,6 @@ int main() {
     for (Block &block : blocks) {
         int record_offset = 0;
         for (Record &record : block.records) {
-            // if (record.fg_pct_home == 0.6f) {
-            //     std::cout << "hit" << std::endl;
-            // }
             RecordPointer recordPointer = {record.fg_pct_home, record_offset, 0};
             tree.insert(record.fg_pct_home, &recordPointer);
             record_offset++;
@@ -41,21 +38,8 @@ int main() {
     };
     tree.task_2();
 
-    delete &storage;
-    Storage storage = Storage();
+    storage = Storage();
     tree.storage = &storage;
     tree.task_3();
-    // int number_of_target = 0;
-    // std::vector<Record*> searchResults = tree.search(0.6f);
-    // for (Record* r : searchResults) {
-    //     std::cout << r->fg_pct_home << " " << r->ft_pct_home << std::endl;
-    //     number_of_target++;
-    // };
-    // std::cout << "Number of target: " << number_of_target << std::endl;
-    // searchResults = tree.search(30);
-    // for (Record* r : searchResults) {
-    //     std::cout << r->fg_pct_home << " " << r->ft_pct_home << std::endl;
-    // };
-
     return 0;
 }
