@@ -119,7 +119,7 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
             block.serialize(buffer, &bytesToWrite);
             std::string blockFilename = filename + std::to_string(block.id) + ".dat";
             std::cout << "Writing block " << blockFilename << "\n";
-            std::ofstream file(filename, std::ios::binary);
+            std::ofstream file(blockFilename, std::ios::binary);
             if (!file) {
                 std::cerr << "Error opening file for writing.\n";
                 return;
@@ -137,7 +137,7 @@ void Storage::writeDatabaseFile(const std::string &filename, const std::vector<R
         block.id = totalBlocks;
         block.serialize(buffer, &bytesToWrite);
         std::string blockFilename = filename + std::to_string(block.id) + ".dat";
-        std::ofstream file(filename, std::ios::binary);
+        std::ofstream file(blockFilename, std::ios::binary);
         if (!file) {
             std::cerr << "Error opening file for writing.\n";
             return;
