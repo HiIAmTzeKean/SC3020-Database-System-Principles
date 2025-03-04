@@ -25,7 +25,7 @@ public:
 
   class Iterator {
   public:
-    Iterator(Node *node, int index, float right_key, BPlusTree *tree);
+    Iterator(const BPlusTree *tree, Node *node, int index);
 
     Record &operator*() const { return *record(); };
     Record *operator->() const { return record(); };
@@ -37,18 +37,16 @@ public:
 
     Node *current;
     int index;
-    int vector_index = 0;
-    float right_key;
-    BPlusTree *tree;
+    int vector_index;
+    const BPlusTree *tree;
   };
 
-  Iterator search_range_begin(float left_key, float right_key);
-  Iterator search_range_end();
-  std::pair<Iterator, Iterator> search_range_iter(float left_key,
-                                                  float right_key);
+  Iterator begin() const;
+  Iterator search(float key) const;
+  Iterator end() const;
 
   int get_index(float key, Node *node);
-  Node *search_leaf_node(float key);
+  Node *search_leaf_node(float key) const;
   void insert(float key, RecordPointer value);
   void print();
   void print_node(Node *node, int level);
@@ -56,10 +54,7 @@ public:
   std::vector<float> get_root_keys();
   int get_number_of_nodes();
   void task_2();
-  void task_3();
 
-  int index_block_hit = 0;
-  int data_block_hit = 0;
   Storage *storage = nullptr;
 
 private:

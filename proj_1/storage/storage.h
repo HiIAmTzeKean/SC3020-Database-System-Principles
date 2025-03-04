@@ -19,7 +19,7 @@
 #endif
 
 struct Record {
-  uint32_t game_date_est; // 4 bytes (DDMMYYYY)
+  uint32_t game_date_est; // 4 bytes (YYYYMMDD)
   uint32_t team_id_home;  // 4 bytes (0-4,294,967,295)
   float fg_pct_home;      // 4 bytes
   float ft_pct_home;      // 4 bytes
@@ -37,7 +37,7 @@ struct Block {
   std::vector<Record> records;
   uint16_t id = 0;
 
-  int serialize(char *buffer);
+  int serialize(char *buffer) const;
 
   void deserialize(char *buffer, int bytesToRead);
 };
@@ -54,27 +54,31 @@ public:
   int block_size;
   int max_records_per_block();
 
-  Storage() : block_size(get_system_block_size_setting()) {
+  Storage(const std::string &storage_location)
+      : block_size(get_system_block_size()),
+        storage_location(storage_location) {
     m_buffer = new char[block_size]{};
   };
   ~Storage() { delete[] m_buffer; };
 
-  int write_database_file(const std::string &filename,
-                          const std::vector<Record> &records);
+  int write_data_blocks(const std::vector<Record> &records);
 
-  Block *read_block(int id);
-  Block read_database_file(const std::string &filename);
+  Block *get_data_block(int id);
   std::vector<Record> read_records_from_file(const std::string &filename);
 
+  size_t loaded_index_block_count() const;
   size_t loaded_data_block_count() const;
   void flush_blocks();
 
   void report_statistics();
-  void brute_force_scan(std::vector<Record> const &records, float min,
-                        float max);
 
 private:
-  int get_system_block_size_setting(void);
+  int get_system_block_size();
+  Block read_data_block(int id);
+  int write_block_to_file(const Block &block);
+  const std::string data_block_location(int id);
+
+  std::string storage_location;
   char *m_buffer;
   std::vector<LoadedBlock> loaded_blocks;
 };

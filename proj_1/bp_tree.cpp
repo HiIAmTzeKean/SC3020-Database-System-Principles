@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <iostream>
 #include <optional>
-#include <utility>
 #include <vector>
 
 int ceil_div(int a, int b) { return (a + b - 1) / b; };
@@ -218,13 +217,12 @@ BPlusTree::BPlusTree(Storage *storage, int degree)
 
 BPlusTree::~BPlusTree() { delete root; };
 
-BPlusTree::Iterator::Iterator(Node *node, int index, float right_key,
-                              BPlusTree *tree)
-    : current(node), index(index), right_key(right_key), tree(tree) {};
+BPlusTree::Iterator::Iterator(const BPlusTree *tree, Node *node, int index)
+    : current(node), index(index), vector_index(0), tree(tree) {};
 
 Record *BPlusTree::Iterator::record() const {
   auto record_address = current->record_values[index][vector_index];
-  auto block = tree->storage->read_block(record_address.block_id);
+  auto block = tree->storage->get_data_block(record_address.block_id);
   return &block->records[record_address.offset];
 };
 
@@ -240,31 +238,39 @@ BPlusTree::Iterator &BPlusTree::Iterator::operator++() {
   if (index < current->size)
     return *this;
   // Advance index block.
-  ++tree->index_block_hit;
   current = current->next;
   index = 0;
   return *this;
 };
 
 bool BPlusTree::Iterator::operator!=(const Iterator &other) const {
-  return current != other.current && current->keys[index] <= right_key;
+  return current != other.current || vector_index != other.vector_index ||
+         index != other.index;
 };
 
-BPlusTree::Iterator BPlusTree::search_range_begin(float left_key,
-                                                  float right_key) {
-  Node *current = search_leaf_node(left_key);
+BPlusTree::Iterator BPlusTree::begin() const {
+  Node *current = this->root;
+  auto iteration_count = 0;
+  while (!current->is_leaf) {
+    current = current->node_values[0];
+    ++iteration_count;
+    assert(iteration_count < 10000);
+  }
+  return Iterator(this, current, 0);
+}
+
+BPlusTree::Iterator BPlusTree::search(float key) const {
+  Node *current = search_leaf_node(key);
   if (current == nullptr) {
-    return Iterator(nullptr, 0, right_key, this);
+    return Iterator(this, nullptr, 0);
   }
-  int i = 0;
-  while (i < current->size && current->keys[i] < left_key) {
-    i++;
-  }
-  return Iterator(current, i, right_key, this);
+  assert(current->is_leaf);
+  auto it = std::find(current->keys, current->keys + current->size, key);
+  return Iterator(this, current, it - current->keys);
 };
 
-BPlusTree::Iterator BPlusTree::search_range_end() {
-  return Iterator(nullptr, 0, 0, this);
+BPlusTree::Iterator BPlusTree::end() const {
+  return Iterator(this, nullptr, 0);
 };
 
 int BPlusTree::get_index(float key, Node *node) {
@@ -276,28 +282,19 @@ int BPlusTree::get_index(float key, Node *node) {
   return -1;
 };
 
-Node *BPlusTree::search_leaf_node(float key) {
+Node *BPlusTree::search_leaf_node(float key) const {
   if (root == nullptr) {
     return nullptr;
   }
   Node *current = root;
-  index_block_hit++; // for root
-
   while (!current->is_leaf) {
     int i = 0;
     while (i < current->size - 1 && current->keys[i] <= key) {
       i++;
     }
     current = current->node_values[i];
-    index_block_hit++; // for internal node
   }
   return current;
-};
-
-std::pair<BPlusTree::Iterator, BPlusTree::Iterator>
-BPlusTree::search_range_iter(float left_key, float right_key) {
-  return std::make_pair(search_range_begin(left_key, right_key),
-                        search_range_end());
 };
 
 void BPlusTree::print() {
@@ -386,33 +383,3 @@ void BPlusTree::task_2() {
   }
   std::cout << "]" << std::endl;
 };
-
-void BPlusTree::task_3() {
-  float sum = 0;
-  int num_results = 0;
-  auto start_time = std::chrono::high_resolution_clock::now();
-
-  auto [begin, end] = this->search_range_iter(0.6, 0.9);
-  for (auto it = begin; it != end; ++it) {
-    assert(it->fg_pct_home >= 0.6);
-    assert(it->fg_pct_home <= 0.9);
-    sum += it->fg_pct_home;
-    num_results++;
-  }
-
-  auto end_time = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double> time_taken = end_time - start_time;
-  std::cout << "B+ Tree scan time: " << time_taken.count() << " seconds"
-            << '\n';
-
-  std::cout << "Number of records found in range: " << num_results << '\n';
-  if (num_results > 0) {
-    float avg = sum / num_results;
-    std::cout << "Average of 'FG_PCT_home': " << avg << '\n';
-  }
-
-  std::cout << "Number of index blocks accessed in tree: "
-            << this->index_block_hit << '\n';
-  std::cout << "Number of data blocks accessed in tree: "
-            << this->storage->loaded_data_block_count() << '\n';
-}
