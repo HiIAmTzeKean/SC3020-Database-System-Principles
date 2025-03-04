@@ -30,7 +30,6 @@ Node::Node(int degree, bool is_leaf) : is_leaf(is_leaf), degree(degree) {
     return;
   }
   auto child_node_count = degree + 1;
-  this->keys = new float[degree];
   this->node_values = new Node *[child_node_count] { nullptr };
 };
 

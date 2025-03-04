@@ -29,17 +29,15 @@ struct Record {
   uint16_t pts_home;      // 2 bytes (0-65,535)
   bool home_team_wins;    // 1 byte
 
-  static int sizeUnpadded(); // 27 bytes
-  static int size();         // 28 bytes (actual size w/ padding)
+  static int size_unpadded(); // 27 bytes
+  static int size();          // 28 bytes (actual size w/ padding)
 };
 
 struct Block {
   std::vector<Record> records;
   uint16_t id = 0;
 
-  static int maxRecordsPerBlock();
-
-  void serialize(char *buffer, int *bytesToWrite);
+  int serialize(char *buffer);
 
   void deserialize(char *buffer, int bytesToRead);
 };
@@ -49,27 +47,33 @@ struct LoadedBlock {
   Block block;
 };
 
-struct Storage {
-  static int BlockSize;
+class Storage {
+public:
   int number_of_records = 0;
   std::vector<LoadedBlock> loaded_blocks;
 
-  Storage() { BlockSize = getSystemBlockSizeSetting(); };
+  int block_size;
+  int max_records_per_block();
 
-  std::vector<Record> readRecordsFromFile(const std::string &filename);
+  Storage() : block_size(get_system_block_size_setting()) {
+    m_buffer = new char[block_size]{};
+  };
+  ~Storage() { delete[] m_buffer; };
+
+  int write_database_file(const std::string &filename,
+                          const std::vector<Record> &records);
 
   Block *read_block(int id);
+  Block read_database_file(const std::string &filename);
+  std::vector<Record> read_records_from_file(const std::string &filename);
 
-  int writeDatabaseFile(const std::string &filename,
-                        const std::vector<Record> &records);
+  void report_statistics();
+  void brute_force_scan(std::vector<Record> const &records, float min,
+                        float max);
 
-  Block readDatabaseFile(const std::string &filename);
-
-  void reportStatistics();
-
-  void bruteForceScan(std::vector<Record> const &records, float min, float max);
-
-  int getSystemBlockSizeSetting(void);
+private:
+  int get_system_block_size_setting(void);
+  char *m_buffer;
 };
 
 #endif // STORAGE_H

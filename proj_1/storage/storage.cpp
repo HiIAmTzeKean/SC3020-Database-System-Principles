@@ -1,9 +1,7 @@
 #include "storage.h"
 #include <assert.h>
 
-int Storage::BlockSize = 0;
-
-int Record::sizeUnpadded() {
+int Record::size_unpadded() {
   return sizeof(game_date_est) + sizeof(team_id_home) + sizeof(pts_home) +
          sizeof(fg_pct_home) + sizeof(ft_pct_home) + sizeof(fg3_pct_home) +
          sizeof(ast_home) + sizeof(reb_home) + sizeof(home_team_wins);
@@ -12,32 +10,30 @@ int Record::sizeUnpadded() {
 // Actual size allocated with padding
 int Record::size() { return sizeof(Record); }
 
-int Block::maxRecordsPerBlock() { return Storage::BlockSize / Record::size(); }
+int Storage::max_records_per_block() { return block_size / Record::size(); }
 
 // Serialize Block data into a buffer
-void Block::serialize(char *buffer, int *bytesToWrite) {
-  int offset = 0;
-
+int Block::serialize(char *buffer) {
   // Serialize the block id
-  std::memcpy(buffer + offset, &id, sizeof(id));
-  offset += sizeof(id);
+  std::memcpy(buffer, &id, sizeof(id));
+  int offset = sizeof(id);
 
   // Serialize the records
   for (const auto &record : records) {
     std::memcpy(buffer + offset, &record, Record::size());
     offset += Record::size();
   }
-  *bytesToWrite = offset;
+  return offset;
 }
 
-void Block::deserialize(char *buffer, int bytesToRead) {
+void Block::deserialize(char *buffer, int bytes_to_read) {
   int offset = 0;
   // Deserialize the block id
   std::memcpy(&id, buffer + offset, sizeof(id));
   offset += sizeof(id);
 
   // Deserialize the records
-  while (offset + Record::size() <= bytesToRead) {
+  while (offset + Record::size() <= bytes_to_read) {
     Record record;
     std::memcpy(&record, buffer + offset, Record::size());
     records.push_back(record);
@@ -45,12 +41,13 @@ void Block::deserialize(char *buffer, int bytesToRead) {
   }
 }
 
-std::vector<Record> Storage::readRecordsFromFile(const std::string &filename) {
+std::vector<Record>
+Storage::read_records_from_file(const std::string &filename) {
   std::vector<Record> records;
   std::ifstream file(filename);
 
   if (!file) {
-    std::cerr << "Error: Unable to open file " << filename << "\n";
+    std::cerr << "Error: Unable to open file " << filename << std::endl;
     return records;
   }
 
@@ -58,18 +55,19 @@ std::vector<Record> Storage::readRecordsFromFile(const std::string &filename) {
   // Skip the header line
   std::getline(file, line);
 
-  int numSkips = 0;
+  int num_skips = 0;
 
   while (std::getline(file, line)) {
     std::istringstream ss(line);
     Record record;
 
+    std::memset(&record, 0, sizeof(Record));
     std::string game_date_est;
     // Skip line if field value is missing
     if (!(ss >> game_date_est >> record.team_id_home >> record.pts_home >>
           record.fg_pct_home >> record.ft_pct_home >> record.fg3_pct_home >>
           record.ast_home >> record.reb_home >> record.home_team_wins)) {
-      numSkips++;
+      num_skips++;
       continue;
     }
 
@@ -79,83 +77,81 @@ std::vector<Record> Storage::readRecordsFromFile(const std::string &filename) {
         3) {
       record.game_date_est = (day * 1000000) + (month * 10000) + year;
     } else {
-      std::cerr << "Error: Invalid date format: " << game_date_est << "\n";
+      std::cerr << "Error: Invalid date format: " << game_date_est << std::endl;
       continue;
     }
     records.push_back(record);
   }
 
-  std::cout << "Number of skipped records: " << numSkips << "\n";
+  std::cout << "Number of skipped records: " << num_skips << std::endl;
   file.close();
   return records;
 }
 
-int Storage::writeDatabaseFile(const std::string &filename,
-                               const std::vector<Record> &records) {
-  int maxRecords = Block::maxRecordsPerBlock();
-  char buffer[BlockSize];
+int Storage::write_database_file(const std::string &filename,
+                                 const std::vector<Record> &records) {
+  int max_records = max_records_per_block();
   Block block;
-  int bytesToWrite;
-  int totalBlocks = 0;
-  int totalRecords = 0;
+  int total_blocks = 0;
+  int total_records = 0;
 
   for (const auto &record : records) {
     block.records.push_back(record);
-    if (block.records.size() == maxRecords) {
-      block.id = totalBlocks;
-      block.serialize(buffer, &bytesToWrite);
-      std::string blockFilename = filename + std::to_string(block.id) + ".dat";
-      std::ofstream file(blockFilename, std::ios::binary);
+    if (block.records.size() == max_records) {
+      block.id = total_blocks;
+      int bytes_to_write = block.serialize(m_buffer);
+      std::string block_filename = filename + std::to_string(block.id) + ".dat";
+      std::ofstream file(block_filename, std::ios::binary);
       if (!file) {
-        std::cerr << "Error opening file for writing.\n";
+        std::cerr << "Error opening file for writing." << std::endl;
         return -1;
       }
-      file.write(buffer, BlockSize);
+      file.write(m_buffer, bytes_to_write);
       file.close();
-      totalBlocks++;
-      totalRecords += block.records.size();
+      total_blocks++;
+      total_records += block.records.size();
       block.records.clear();
     }
   }
 
   // Serialize partial block
   if (!block.records.empty()) {
-    block.id = totalBlocks;
-    block.serialize(buffer, &bytesToWrite);
-    std::string blockFilename = filename + std::to_string(block.id) + ".dat";
-    std::ofstream file(blockFilename, std::ios::binary);
+    block.id = total_blocks;
+    int bytes_to_write = block.serialize(m_buffer);
+    std::string block_filename = filename + std::to_string(block.id) + ".dat";
+    std::ofstream file(block_filename, std::ios::binary);
     if (!file) {
-      std::cerr << "Error opening file for writing.\n";
+      std::cerr << "Error opening file for writing." << std::endl;
       return -1;
     }
-    file.write(buffer,
-               bytesToWrite); // Write only the used portion of the block
+    file.write(m_buffer,
+               bytes_to_write); // Write only the used portion of the block
     file.close();
-    totalBlocks++;
-    totalRecords += block.records.size();
+    total_blocks++;
+    total_records += block.records.size();
     block.records.clear();
   }
 
-  std::cout << "Database file written successfully.\n";
-  std::cout << "Total blocks written: " << totalBlocks << "\n";
-  std::cout << "Total records written: " << totalRecords << "\n";
-  return totalBlocks;
+  std::cout << "Database file written successfully." << std::endl;
+  std::cout << "Total blocks written: " << total_blocks << std::endl;
+  std::cout << "Total records written: " << total_records << std::endl;
+
+  return total_blocks;
 }
 
-Block Storage::readDatabaseFile(const std::string &filename) {
+Block Storage::read_database_file(const std::string &filename) {
   std::ifstream file(filename, std::ios::binary);
   if (!file) {
     throw std::runtime_error("Error opening file for reading.");
   }
 
-  char buffer[BlockSize];
   Block block;
 
-  while (file.read(buffer, BlockSize) || file.gcount()) {
-    int bytesToRead = file.gcount() < BlockSize
-                          ? file.gcount() // Read partial block
-                          : BlockSize;
-    block.deserialize(buffer, bytesToRead);
+  while (file.read(m_buffer, block_size) || file.gcount()) {
+    int bytes_to_read = file.gcount() < block_size
+                            ? file.gcount() // Read partial block
+                            : block_size;
+    block.deserialize(m_buffer, bytes_to_read);
   }
   number_of_records += block.records.size();
   loaded_blocks.push_back({.id = block.id, .block = block});
@@ -163,15 +159,17 @@ Block Storage::readDatabaseFile(const std::string &filename) {
   return block;
 }
 
-void Storage::reportStatistics() {
-  int recordsPerBlock = Block::maxRecordsPerBlock();
+void Storage::report_statistics() {
+  int records_per_block = max_records_per_block();
 
-  std::cout << "\nTask 1: Storage" << "\n";
+  std::cout << "Task 1: Storage" << std::endl;
   std::cout << "Record size: " << Record::size() << " bytes ("
-            << Record::sizeUnpadded() << " bytes without padding)\n";
-  std::cout << "Number of Records: " << number_of_records << "\n";
-  std::cout << "Number of Records per Block: " << recordsPerBlock << "\n";
-  std::cout << "Number of Blocks: " << loaded_blocks.size() << "\n";
+            << Record::size_unpadded() << " bytes without padding)"
+            << std::endl;
+  std::cout << "Number of Records: " << number_of_records << std::endl;
+  std::cout << "Number of Records per Block: " << records_per_block
+            << std::endl;
+  std::cout << "Number of Blocks: " << loaded_blocks.size() << std::endl;
 }
 
 Block *Storage::read_block(int id) {
@@ -180,49 +178,50 @@ Block *Storage::read_block(int id) {
       return &block.block;
   }
   // This block is currently not loaded.
-  readDatabaseFile("data/block_" + std::to_string(id) + ".dat");
+  read_database_file("data/block_" + std::to_string(id) + ".dat");
   auto latest_load = this->loaded_blocks.rbegin();
   assert(latest_load->id == id);
   return &latest_load->block;
 }
 
-void Storage::bruteForceScan(std::vector<Record> const &records, float min,
-                             float max) {
-  int blockCount = 0;
-  int filteredRecordCount = 0;
+void Storage::brute_force_scan(std::vector<Record> const &records, float min,
+                               float max) {
+  int block_count = 0;
+  int filtered_record_count = 0;
   float sum = 0;
 
   auto start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < records.size(); i++) {
-    if (i % Block::maxRecordsPerBlock() == 0) {
-      blockCount++;
+    if (i % max_records_per_block() == 0) {
+      block_count++;
     }
 
     if (records[i].fg_pct_home >= min && records[i].fg_pct_home <= max) {
       sum += records[i].fg_pct_home;
-      filteredRecordCount++;
+      filtered_record_count++;
     }
   }
   auto end = std::chrono::high_resolution_clock::now(); // End time
 
-  std::cout << "\nTask 3: Brute-force Linear Scan (search 'FG_PCT_HOME' from "
+  std::cout << std::endl
+            << "Task 3: Brute-force Linear Scan (search 'FG_PCT_HOME' from "
                "0.6 to 0.9, both inclusively)"
-            << "\n";
-  std::cout << "Number of records found in range: " << filteredRecordCount
-            << '\n';
-  std::cout << "Number of data blocks accessed: " << blockCount << '\n';
-  if (filteredRecordCount > 0) {
-    float avg = sum / filteredRecordCount;
-    std::cout << "Average of 'FG_PCT_home': " << avg << '\n';
+            << std::endl;
+  std::cout << "Number of records found in range: " << filtered_record_count
+            << std::endl;
+  std::cout << "Number of data blocks accessed: " << block_count << std::endl;
+  if (filtered_record_count > 0) {
+    float avg = sum / filtered_record_count;
+    std::cout << "Average of 'FG_PCT_home': " << avg << std::endl;
   }
 
   std::chrono::duration<double> time_taken = end - start; // Duration in seconds
   std::cout << "Brute-force scan time: " << time_taken.count() << " seconds"
-            << '\n';
+            << std::endl;
 }
 
 // Get the current system's block size (page size) in bytes
-int Storage::getSystemBlockSizeSetting(void) {
+int Storage::get_system_block_size_setting(void) {
   int block_size;
 #ifdef _WIN32
   SYSTEM_INFO si;
@@ -234,14 +233,16 @@ int Storage::getSystemBlockSizeSetting(void) {
   if (block_size == -1) {
     block_size = 4096;
     std::cout << "Failed to get system block size, setting block size to "
-                 "default of 4096 bytes.\n";
+                 "default of 4096 bytes."
+              << std::endl;
   }
 #else
   block_size = 4096;
   std::cout << "Failed to get system block size, setting block size to default "
-               "of 4096 bytes.\n";
+               "of 4096 bytes."
+            << std::endl;
 #endif
 
-  std::cout << "System block size: " << block_size << "bytes \n";
+  std::cout << "System block size: " << block_size << " byte" << std::endl;
   return block_size;
 }

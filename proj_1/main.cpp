@@ -4,8 +4,8 @@
 
 int main() {
   std::string inputFile = "games.txt";
-  Storage storage;
-  std::vector<Record> records = storage.readRecordsFromFile(inputFile);
+  auto storage = Storage();
+  std::vector<Record> records = storage.read_records_from_file(inputFile);
 
   if (records.empty()) {
     std::cerr << "No records found in the file.\n";
@@ -13,25 +13,25 @@ int main() {
   }
 
   std::string outputFile = "data/block_";
-  auto block_count = storage.writeDatabaseFile(outputFile, records);
+  auto block_count = storage.write_database_file(outputFile, records);
 
   std::vector<Block> blocks;
   for (int i = 0; i < block_count; i++) {
     std::string filename = outputFile + std::to_string(i) + ".dat";
-    Block b = storage.readDatabaseFile(filename);
+    Block b = storage.read_database_file(filename);
     blocks.push_back(b);
   }
 
   // Task 1: Storage component
-  storage.reportStatistics();
+  storage.report_statistics();
 
   // Task 3: Search for rows with attribute “FG_PCT_home” from 0.6 to 0.9 (both
   // inclusively)
-  storage.bruteForceScan(records, 0.6, 0.9);
+  storage.brute_force_scan(records, 0.6, 0.9);
 
-  storage = Storage();
+  Storage tree_storage = Storage();
   BPlusTree tree = BPlusTree(5);
-  tree.storage = &storage;
+  tree.storage = &tree_storage;
   for (Block &block : blocks) {
     int record_offset = 0;
     for (Record &record : block.records) {
