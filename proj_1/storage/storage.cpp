@@ -159,10 +159,14 @@ Block Storage::read_database_file(const std::string &filename) {
   return block;
 }
 
+size_t Storage::loaded_data_block_count() const {
+  return this->loaded_blocks.size();
+}
+void Storage::flush_blocks() { this->loaded_blocks.clear(); }
+
 void Storage::report_statistics() {
   int records_per_block = max_records_per_block();
 
-  std::cout << "Task 1: Storage" << std::endl;
   std::cout << "Record size: " << Record::size() << " bytes ("
             << Record::size_unpadded() << " bytes without padding)"
             << std::endl;
@@ -203,10 +207,6 @@ void Storage::brute_force_scan(std::vector<Record> const &records, float min,
   }
   auto end = std::chrono::high_resolution_clock::now(); // End time
 
-  std::cout << std::endl
-            << "Task 3: Brute-force Linear Scan (search 'FG_PCT_HOME' from "
-               "0.6 to 0.9, both inclusively)"
-            << std::endl;
   std::cout << "Number of records found in range: " << filtered_record_count
             << std::endl;
   std::cout << "Number of data blocks accessed: " << block_count << std::endl;

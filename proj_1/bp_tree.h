@@ -20,7 +20,7 @@ struct RecordPointer {
 class Node;
 class BPlusTree {
 public:
-  BPlusTree(int degree);
+  BPlusTree(Storage *storage, int degree);
   ~BPlusTree();
 
   class Iterator {

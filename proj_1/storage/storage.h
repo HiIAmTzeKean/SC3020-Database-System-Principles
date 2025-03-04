@@ -50,7 +50,6 @@ struct LoadedBlock {
 class Storage {
 public:
   int number_of_records = 0;
-  std::vector<LoadedBlock> loaded_blocks;
 
   int block_size;
   int max_records_per_block();
@@ -67,6 +66,9 @@ public:
   Block read_database_file(const std::string &filename);
   std::vector<Record> read_records_from_file(const std::string &filename);
 
+  size_t loaded_data_block_count() const;
+  void flush_blocks();
+
   void report_statistics();
   void brute_force_scan(std::vector<Record> const &records, float min,
                         float max);
@@ -74,6 +76,7 @@ public:
 private:
   int get_system_block_size_setting(void);
   char *m_buffer;
+  std::vector<LoadedBlock> loaded_blocks;
 };
 
 #endif // STORAGE_H

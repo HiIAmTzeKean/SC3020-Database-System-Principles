@@ -211,8 +211,8 @@ Node::CreatedSibling Node::split_internal_child(float key, Node *record) {
   return {sibling, left_key};
 };
 
-BPlusTree::BPlusTree(int degree) {
-  this->degree = degree;
+BPlusTree::BPlusTree(Storage *storage, int degree)
+    : storage(storage), degree(degree) {
   this->root = new Node(degree);
 };
 
@@ -372,8 +372,9 @@ int BPlusTree::get_number_of_nodes() {
 };
 
 void BPlusTree::task_2() {
-  int height = this->get_height();
-  std::cout << "Height: " << height << std::endl;
+  std::cout << "Parameter N: " << degree << std::endl;
+  std::cout << "Number of nodes: " << this->get_number_of_nodes() << std::endl;
+  std::cout << "Number of levels: " << this->get_height() << std::endl;
 
   std::vector<float> keys = this->get_root_keys();
   std::cout << "Root keys: [";
@@ -384,9 +385,6 @@ void BPlusTree::task_2() {
     }
   }
   std::cout << "]" << std::endl;
-
-  int number_of_nodes = this->get_number_of_nodes();
-  std::cout << "Number of nodes: " << number_of_nodes << std::endl;
 };
 
 void BPlusTree::task_3() {
@@ -416,5 +414,5 @@ void BPlusTree::task_3() {
   std::cout << "Number of index blocks accessed in tree: "
             << this->index_block_hit << '\n';
   std::cout << "Number of data blocks accessed in tree: "
-            << this->storage->loaded_blocks.size() << '\n';
+            << this->storage->loaded_data_block_count() << '\n';
 }

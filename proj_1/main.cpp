@@ -12,6 +12,8 @@ int main() {
     return 1;
   }
 
+  std::cout << std::endl;
+  std::cout << "Step 0: Construct Database and Tree" << std::endl;
   std::string outputFile = "data/block_";
   auto block_count = storage.write_database_file(outputFile, records);
 
@@ -22,16 +24,8 @@ int main() {
     blocks.push_back(b);
   }
 
-  // Task 1: Storage component
-  storage.report_statistics();
-
-  // Task 3: Search for rows with attribute “FG_PCT_home” from 0.6 to 0.9 (both
-  // inclusively)
-  storage.brute_force_scan(records, 0.6, 0.9);
-
   Storage tree_storage = Storage();
-  BPlusTree tree = BPlusTree(5);
-  tree.storage = &tree_storage;
+  BPlusTree tree = BPlusTree(&tree_storage, 5);
   for (Block &block : blocks) {
     int record_offset = 0;
     for (Record &record : block.records) {
@@ -42,6 +36,7 @@ int main() {
       ++record_offset;
     };
   };
+  std::cout << std::endl;
 
   // Sanity check that the tree is sorted.
   float prev_key = -10000;
@@ -51,7 +46,23 @@ int main() {
     prev_key = it->fg_pct_home;
   }
 
+  std::cout << "Task 1: Storage" << std::endl;
+  storage.report_statistics();
+  std::cout << std::endl;
+
+  std::cout << "Task 2: B-Tree Statistics" << std::endl;
   tree.task_2();
+  std::cout << std::endl;
+
+  // Task 3: Search for rows with attribute “FG_PCT_home” from 0.6 to 0.9 (both
+  // inclusively)
+  std::cout << "Task 3: Index Scan vs Brute-Force Linear Scan ('FG_PCT_HOME' "
+               "from 0.6 to 0.9, inclusively)"
+            << std::endl;
+  std::cout << "Brute-Force:" << std::endl;
+  storage.brute_force_scan(records, 0.6, 0.9);
+
+  std::cout << "Index Scan (B+ tree):" << std::endl;
   tree.task_3();
   return 0;
 }
