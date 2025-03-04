@@ -44,15 +44,21 @@ struct Block {
   void deserialize(char *buffer, int bytesToRead);
 };
 
+struct LoadedBlock {
+  int id;
+  Block block;
+};
+
 struct Storage {
   static int BlockSize;
   int number_of_records = 0;
-  std::vector<int> loaded_blocks;
-  std::vector<Block> blocks;
+  std::vector<LoadedBlock> loaded_blocks;
 
   Storage() { BlockSize = getSystemBlockSizeSetting(); };
 
   std::vector<Record> readRecordsFromFile(const std::string &filename);
+
+  Block *read_block(int id);
 
   int writeDatabaseFile(const std::string &filename,
                         const std::vector<Record> &records);

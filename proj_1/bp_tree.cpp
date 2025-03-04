@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <iostream>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -11,44 +12,37 @@ int ceil_div(int a, int b) { return (a + b - 1) / b; };
 int floor_div(int a, int b) { return a / b; };
 
 void BPlusTree::insert(float key, RecordPointer value) {
-  if (root->is_leaf) {
-    auto [new_child, new_key] = root->insert(key, value);
-    if (new_child != nullptr) {
-      Node *new_root = new Node(degree, 0);
-      new_root->keys[0] = new_key;
-      new_root->node_values[0] = root;
-      new_root->node_values[1] = new_child;
-      new_root->size = 2;
-      root = new_root;
-    }
-  } else {
-    auto [new_child, new_key] = root->insert(key, value);
-    if (new_child == nullptr) {
-      return;
-    }
-
-    Node *new_root = new Node(degree, 0);
-    new_root->keys[0] = new_key;
-    new_root->node_values[0] = root;
-    new_root->node_values[1] = new_child;
-    new_root->size = 2;
-    root = new_root;
-  }
+  auto optional_created_sibling = root->insert(key, value);
+  if (!optional_created_sibling.has_value())
+    return;
+  auto new_sibling = optional_created_sibling.value();
+  auto new_root = new Node(degree, root, new_sibling.key, new_sibling.node);
+  root = new_root;
 };
 
+// Empty node creation.
 Node::Node(int degree, bool is_leaf) : is_leaf(is_leaf), degree(degree) {
+  assert(degree > 2);
   this->keys = new float[degree];
-  if (this->is_leaf) {
+  if (is_leaf) {
     this->record_values.resize(degree);
-  } else {
-    // internal node has degree + 1 pointers
-    degree++;
-    this->node_values = new Node *[degree];
-    for (int i = 0; i < degree; i++) {
-      node_values[i] = nullptr;
-    }
+    this->next = nullptr;
+    return;
   }
-  this->next = nullptr;
+  auto child_node_count = degree + 1;
+  this->keys = new float[degree];
+  this->node_values = new Node *[child_node_count] { nullptr };
+};
+
+// Internal node creation.
+Node::Node(int degree, Node *a, float key, Node *b) : Node(degree, false) {
+  assert(degree > 2);
+  assert(a->degree = degree);
+  assert(b->degree = degree);
+  this->keys[0] = key;
+  this->node_values[0] = a;
+  this->node_values[1] = b;
+  size = 2;
 };
 
 Node::~Node() {
@@ -63,136 +57,133 @@ Node::~Node() {
   }
 };
 
-std::pair<Node *, float> Node::insert(float key, RecordPointer record) {
-  if (is_leaf) {
-    // check if duplicate key
-    for (int i = 0; i < size; i++) {
-      if (keys[i] == key) {
-        record_values[i].push_back(record);
-        return {nullptr, 0};
-      }
-    }
+std::optional<Node::CreatedSibling> Node::insert(float key,
+                                                 RecordPointer record) {
+  if (is_leaf)
+    return insert_leaf(key, record);
+  return insert_internal(key, record);
+}
 
-    if (size < degree) {
-      int i = size - 1;
-      while (i >= 0 && keys[i] > key) {
-        keys[i + 1] = keys[i];
-        record_values[i + 1] = record_values[i];
-        i--;
-      }
-      keys[i + 1] = key;
-      record_values.at(i + 1).clear();
-      record_values.at(i + 1).push_back(record);
-      size++;
-      return {nullptr, 0};
-    } else {
-      Node *sibling = split_leaf_child(key, record);
-      return {sibling, sibling->keys[0]};
-    }
-  } else {
-    int i = 0;
-    while (i < size - 1 && keys[i] <= key) {
-      i++;
-    }
-    Node *child = node_values[i];
-    auto [new_child, new_key] = child->insert(key, record);
-
-    if (new_child == nullptr) {
-      return {nullptr, 0};
-    }
-
-    // if current not full add new key
-    if (size < degree + 1) {
-      for (i = size - 2; i >= 0 && keys[i] > new_key; i--) {
-        keys[i + 1] = keys[i];
-        node_values[i + 2] = node_values[i + 1];
-      }
-      keys[i + 1] = new_key;
-      node_values[i + 2] = new_child;
-      size++;
-      return {nullptr, 0};
-    } else {
-      Node *sibling = split_internal_child(new_key, new_child);
-      // shift all sibling keys by 1 to left and move left key up
-      float left_key = sibling->keys[0];
-      for (i = 0; i < sibling->size - 1; i++) {
-        sibling->keys[i] = sibling->keys[i + 1];
-      }
-      return {sibling, left_key};
-    }
+std::optional<Node::CreatedSibling> Node::insert_leaf(float key,
+                                                      RecordPointer record) {
+  assert(is_leaf);
+  auto keys_end = keys + size;
+  auto it = std::lower_bound(keys, keys_end, key);
+  auto key_position = it - keys;
+  if (it != keys_end && *it == key) {
+    // For existing keys, just push back.
+    record_values[key_position].push_back(record);
+    return {};
   }
+  if (size < degree) {
+    // If we can still fit the key, insert it to the correct location.
+    for (auto i = size - 1; i >= key_position; --i) {
+      // Push every entry back.
+      keys[i + 1] = keys[i];
+      record_values[i + 1] = record_values[i];
+    }
+    keys[key_position] = key;
+    record_values.at(key_position).clear();
+    record_values.at(key_position).push_back(record);
+    size++;
+    return {};
+  }
+  // Otherwise, split into two nodes.
+  Node *sibling = split_leaf_child(key, record);
+  return {{.node = sibling, .key = sibling->keys[0]}};
+}
+
+std::optional<Node::CreatedSibling>
+Node::insert_internal(float key, RecordPointer record) {
+  assert(!is_leaf);
+  auto key_position = 0;
+  while (key_position < size - 1 && keys[key_position] <= key) {
+    ++key_position;
+  }
+  Node *child_for_key = node_values[key_position];
+  auto optional_new_child = child_for_key->insert(key, record);
+  if (!optional_new_child.has_value()) {
+    return {};
+  }
+  // Insert the new node due to overflow into ourselves.
+  auto [new_child_node, new_child_key] = optional_new_child.value();
+  if (size < degree + 1) {
+    int i;
+    for (i = size - 2; i >= 0 && keys[i] > new_child_key; --i) {
+      keys[i + 1] = keys[i];
+      node_values[i + 2] = node_values[i + 1];
+    }
+    ++i;
+    keys[i] = new_child_key;
+    node_values[i + 1] = new_child_node;
+    ++size;
+    return {};
+  }
+  return split_internal_child(new_child_key, new_child_node);
 };
 
 Node *Node::split_leaf_child(float key, RecordPointer record) {
-  Node *sibling = new Node(degree, this->is_leaf);
-  int split_index = ceil_div(degree + 1, 2);
+  assert(this->is_leaf);
+  Node *sibling = new Node(this->degree, true);
+  sibling->next = this->next;
+  this->next = sibling;
 
+  int split_index = ceil_div(this->degree + 1, 2);
   if (key > keys[split_index - 1]) {
+    // New record should go in second node.
     for (int i = split_index; i < size; i++) {
       sibling->keys[i - split_index] = keys[i];
       sibling->record_values[i - split_index] = record_values[i];
-      keys[i] = 0;
-      record_values[i].clear();
+      this->keys[i] = 0;
+      this->record_values[i].clear();
     }
-    int i = size - split_index - 1;
-    while (i >= 0 && sibling->keys[i] > key) {
-      sibling->keys[i + 1] = sibling->keys[i];
-      sibling->record_values[i + 1] = sibling->record_values[i];
-      sibling->record_values[i].clear();
-      i--;
-    }
-    sibling->keys[i + 1] = key;
-    // sibling->record_values[i + 1] = record;
-    sibling->record_values[i + 1].clear();
-    sibling->record_values[i + 1].push_back(record);
-    sibling->size = size - split_index + 1;
-    size = split_index;
-  } else {
-    split_index--;
-    for (int i = split_index; i < size; i++) {
-      sibling->keys[i - split_index] = keys[i];
-      sibling->record_values[i - split_index] = record_values[i];
-      keys[i] = 0;
-      record_values[i].clear();
-    }
-    // insert into current node
-    int i = split_index - 1;
-    while (i >= 0 && keys[i] > key) {
-      keys[i + 1] = keys[i];
-      record_values[i + 1] = record_values[i];
-      record_values[i].clear();
-      i--;
-    }
-    keys[i + 1] = key;
-    // record_values[i + 1] = record;
-    record_values[i + 1].clear();
-    record_values[i + 1].push_back(record);
-    sibling->size = size - split_index;
-    size = split_index + 1;
+    sibling->size = this->size - split_index;
+    this->size = split_index;
+    auto new_child = sibling->insert_leaf(key, record);
+    // Sibling should have enough space to not create a child.
+    assert(!new_child.has_value());
+    return sibling;
   }
-  sibling->next = next;
-  next = sibling;
+
+  // New record should go in ourselves.
+  --split_index;
+  for (int i = split_index; i < size; ++i) {
+    sibling->keys[i - split_index] = keys[i];
+    sibling->record_values[i - split_index] = record_values[i];
+    keys[i] = 0;
+    record_values[i].clear();
+  }
+  sibling->size = size - split_index;
+  this->size = split_index;
+  auto new_child = this->insert_leaf(key, record);
+  // We should now have enough space to not create a child.
+  assert(!new_child.has_value());
+  assert(this->keys[0] < sibling->keys[0]);
   return sibling;
 };
 
-Node *Node::split_internal_child(float key, Node *record) {
-  Node *sibling = new Node(degree, this->is_leaf);
+Node::CreatedSibling Node::split_internal_child(float key, Node *record) {
+  assert(!this->is_leaf);
+  Node *sibling = new Node(degree, false);
   int split_index = ceil_div(degree, 2);
-  int i = 0;
-
-  if (key > keys[split_index - 1]) {
-    // copy keys
-    for (i = split_index; i < degree; i++) {
-      sibling->keys[i - split_index] = keys[i];
-      keys[i] = 0;
-    }
-    // copy node values
-    for (i = split_index + 1; i < size; i++) {
-      sibling->node_values[i - split_index - 1] = node_values[i];
-      node_values[i] = nullptr;
-    }
-    // insert into sibling
-    i = size - split_index - 2;
+  Node *insert_target_after_split = sibling;
+  assert(key != keys[split_index - 1]);
+  if (key < keys[split_index - 1]) {
+    insert_target_after_split = this;
+    --split_index;
+  }
+  // Move keys and node values.
+  std::copy(this->keys + split_index, this->keys + size - 1, sibling->keys);
+  std::fill(this->keys + split_index, this->keys + size - 1, 0);
+  std::copy(this->node_values + split_index + 1, this->node_values + size,
+            sibling->node_values);
+  std::fill(this->node_values + split_index + 1, this->node_values + size,
+            nullptr);
+  // Update size and insert into the right location.
+  sibling->size = size - split_index - 1;
+  this->size = split_index + 1;
+  if (insert_target_after_split == sibling) {
+    auto i = sibling->size - 1;
     while (i >= 0 && sibling->keys[i] > key) {
       sibling->keys[i + 1] = sibling->keys[i];
       sibling->node_values[i + 1] = sibling->node_values[i];
@@ -200,38 +191,30 @@ Node *Node::split_internal_child(float key, Node *record) {
     }
     sibling->keys[i + 1] = key;
     sibling->node_values[i + 1] = record;
-    sibling->size = size - split_index;
-    size = split_index + 1;
+    ++sibling->size;
   } else {
-    split_index--;
-    // copy keys
-    for (i = split_index; i < degree; i++) {
-      sibling->keys[i - split_index] = keys[i];
-      keys[i] = 0;
-    }
-    // copy node values
-    for (i = split_index + 1; i < size; i++) {
-      sibling->node_values[i - split_index - 1] = node_values[i];
-      node_values[i] = nullptr;
-    }
-    // insert into current node
-    i = split_index - 1;
+    auto i = split_index - 1;
     while (i >= 0 && keys[i] > key) {
       keys[i + 1] = keys[i];
       node_values[i + 2] = node_values[i + 1];
       i--;
     }
-    keys[i + 1] = key;
-    node_values[i + 2] = record;
-    sibling->size = size - split_index - 1;
-    size = split_index + 2;
+    this->keys[i + 1] = key;
+    this->node_values[i + 2] = record;
+    ++this->size;
   }
-  return sibling;
+  assert(this->keys[this->size - 1] < sibling->keys[0]);
+  // shift all sibling keys by 1 to left and move left key up
+  float left_key = sibling->keys[0];
+  for (auto i = 0; i < sibling->size - 1; i++) {
+    sibling->keys[i] = sibling->keys[i + 1];
+  }
+  return {sibling, left_key};
 };
 
 BPlusTree::BPlusTree(int degree) {
   this->degree = degree;
-  this->root = new Node(degree, 1);
+  this->root = new Node(degree);
 };
 
 BPlusTree::~BPlusTree() { delete root; };
@@ -240,38 +223,27 @@ BPlusTree::Iterator::Iterator(Node *node, int index, float right_key,
                               BPlusTree *tree)
     : current(node), index(index), right_key(right_key), tree(tree) {};
 
-std::vector<Record> BPlusTree::Iterator::operator*() const {
-  std::vector<Record> result;
-
-  for (RecordPointer record_pointer : current->record_values[index]) {
-    auto it =
-        std::find(tree->storage->loaded_blocks.begin(),
-                  tree->storage->loaded_blocks.end(), record_pointer.block_id);
-    if (it == tree->storage->loaded_blocks.end()) {
-      tree->storage->readDatabaseFile(
-          "data/block_" + std::to_string(record_pointer.block_id) + ".dat");
-      it = std::find(tree->storage->loaded_blocks.begin(),
-                     tree->storage->loaded_blocks.end(),
-                     record_pointer.block_id);
-      assert(it != tree->storage->loaded_blocks.end());
-    }
-    int block_index = std::distance(tree->storage->loaded_blocks.begin(), it);
-    result.push_back(
-        tree->storage->blocks[block_index].records[record_pointer.offset]);
-  }
-  return result;
+Record *BPlusTree::Iterator::record() const {
+  auto record_address = current->record_values[index][vector_index];
+  auto block = tree->storage->read_block(record_address.block_id);
+  return &block->records[record_address.offset];
 };
 
 BPlusTree::Iterator &BPlusTree::Iterator::operator++() {
-  if (current == nullptr) {
+  if (current == nullptr)
     return *this;
-  }
-  index++;
-  if (index >= current->size) {
-    tree->index_block_hit++;
-    current = current->next;
-    index = 0;
-  }
+  ++vector_index;
+  if (vector_index < current->record_values[index].size())
+    return *this;
+  // Advance index in leaf node.
+  vector_index = 0;
+  ++index;
+  if (index < current->size)
+    return *this;
+  // Advance index block.
+  ++tree->index_block_hit;
+  current = current->next;
+  index = 0;
   return *this;
 };
 
@@ -323,36 +295,6 @@ Node *BPlusTree::search_leaf_node(float key) {
   return current;
 };
 
-std::vector<Record> BPlusTree::search(float key) {
-  Node *current = search_leaf_node(key);
-  if (current == nullptr) {
-    return std::vector<Record>();
-  }
-  int index = get_index(key, current);
-  if (index == -1) {
-    return std::vector<Record>();
-  }
-
-  std::vector<Record> result;
-
-  for (RecordPointer record_pointer : current->record_values[index]) {
-    auto it = std::find(storage->loaded_blocks.begin(),
-                        storage->loaded_blocks.end(), record_pointer.block_id);
-    if (it == storage->loaded_blocks.end()) {
-      storage->readDatabaseFile(
-          "data/block_" + std::to_string(record_pointer.block_id) + ".dat");
-      it = std::find(storage->loaded_blocks.begin(),
-                     storage->loaded_blocks.end(), record_pointer.block_id);
-      assert(it != storage->loaded_blocks.end());
-    }
-    int block_index = std::distance(storage->loaded_blocks.begin(), it);
-    result.push_back(
-        storage->blocks[block_index].records[record_pointer.offset]);
-  }
-
-  return result;
-};
-
 std::pair<BPlusTree::Iterator, BPlusTree::Iterator>
 BPlusTree::search_range_iter(float left_key, float right_key) {
   return std::make_pair(search_range_begin(left_key, right_key),
@@ -367,6 +309,7 @@ void BPlusTree::print() {
 
 void BPlusTree::print_node(Node *node, int level) {
   if (!node) {
+    std::cout << "print_node on VOID!" << std::endl;
     return;
   }
 
@@ -446,6 +389,7 @@ void BPlusTree::task_2() {
   int number_of_nodes = this->get_number_of_nodes();
   std::cout << "Number of nodes: " << number_of_nodes << std::endl;
 };
+
 void BPlusTree::task_3() {
   float sum = 0;
   int num_results = 0;
@@ -453,12 +397,10 @@ void BPlusTree::task_3() {
 
   auto [begin, end] = this->search_range_iter(0.6, 0.9);
   for (auto it = begin; it != end; ++it) {
-    for (Record record : *it) {
-      assert(record.fg_pct_home >= 0.6);
-      assert(record.fg_pct_home <= 0.9);
-      sum += record.fg_pct_home;
-      num_results++;
-    }
+    assert(it->fg_pct_home >= 0.6);
+    assert(it->fg_pct_home <= 0.9);
+    sum += it->fg_pct_home;
+    num_results++;
   }
 
   auto end_time = std::chrono::high_resolution_clock::now();
@@ -475,5 +417,5 @@ void BPlusTree::task_3() {
   std::cout << "Number of index blocks accessed in tree: "
             << this->index_block_hit << '\n';
   std::cout << "Number of data blocks accessed in tree: "
-            << this->storage->blocks.size() << '\n';
+            << this->storage->loaded_blocks.size() << '\n';
 }

@@ -1,5 +1,7 @@
 #include "bp_tree.h"
 #include "storage/storage.h"
+#include <assert.h>
+
 int main() {
   std::string inputFile = "games.txt";
   Storage storage;
@@ -27,7 +29,9 @@ int main() {
   // inclusively)
   storage.bruteForceScan(records, 0.6, 0.9);
 
+  storage = Storage();
   BPlusTree tree = BPlusTree(5);
+  tree.storage = &storage;
   for (Block &block : blocks) {
     int record_offset = 0;
     for (Record &record : block.records) {
@@ -35,13 +39,19 @@ int main() {
                                      .offset = record_offset,
                                      .block_id = block.id};
       tree.insert(record.fg_pct_home, recordPointer);
-      record_offset++;
+      ++record_offset;
     };
   };
-  tree.task_2();
 
-  storage = Storage();
-  tree.storage = &storage;
+  // Sanity check that the tree is sorted.
+  float prev_key = -10000;
+  for (auto it = tree.search_range_begin(-10000, 9999);
+       it != tree.search_range_end(); ++it) {
+    assert(prev_key <= it->fg_pct_home);
+    prev_key = it->fg_pct_home;
+  }
+
+  tree.task_2();
   tree.task_3();
   return 0;
 }

@@ -1,4 +1,5 @@
 #include "storage.h"
+#include <assert.h>
 
 int Storage::BlockSize = 0;
 
@@ -157,8 +158,7 @@ Block Storage::readDatabaseFile(const std::string &filename) {
     block.deserialize(buffer, bytesToRead);
   }
   number_of_records += block.records.size();
-  loaded_blocks.push_back(block.id);
-  blocks.push_back(block);
+  loaded_blocks.push_back({.id = block.id, .block = block});
   file.close();
   return block;
 }
@@ -172,6 +172,18 @@ void Storage::reportStatistics() {
   std::cout << "Number of Records: " << number_of_records << "\n";
   std::cout << "Number of Records per Block: " << recordsPerBlock << "\n";
   std::cout << "Number of Blocks: " << loaded_blocks.size() << "\n";
+}
+
+Block *Storage::read_block(int id) {
+  for (LoadedBlock &block : this->loaded_blocks) {
+    if (id == block.id)
+      return &block.block;
+  }
+  // This block is currently not loaded.
+  readDatabaseFile("data/block_" + std::to_string(id) + ".dat");
+  auto latest_load = this->loaded_blocks.rbegin();
+  assert(latest_load->id == id);
+  return &latest_load->block;
 }
 
 void Storage::bruteForceScan(std::vector<Record> const &records, float min,
