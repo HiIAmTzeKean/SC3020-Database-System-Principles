@@ -22,8 +22,7 @@ int main() {
     Block b = *storage.get_data_block(i);
     int record_offset = 0;
     for (Record &record : b.records) {
-      RecordPointer recordPointer = {
-          .key = record.fg_pct_home, .offset = record_offset, .block_id = b.id};
+      RecordPointer recordPointer = {.offset = record_offset, .block_id = b.id};
       tree.insert(record.fg_pct_home, recordPointer);
       ++record_offset;
     };
@@ -42,7 +41,7 @@ int main() {
   std::cout << std::endl;
 
   std::cout << "Task 2: B-Tree Statistics" << std::endl;
-  tree.task_2();
+  task_2(&tree);
   std::cout << std::endl;
 
   task_3(&tree, &storage, block_count);

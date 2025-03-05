@@ -2,6 +2,22 @@
 #include <assert.h>
 #include <iomanip>
 
+void task_2(BPlusTree *tree) {
+  std::cout << "Parameter N: " << tree->get_degree() << std::endl;
+  std::cout << "Number of nodes: " << tree->get_number_of_nodes() << std::endl;
+  std::cout << "Number of levels: " << tree->get_height() << std::endl;
+
+  std::vector<float> keys = tree->get_root_keys();
+  std::cout << "Root keys: [";
+  for (size_t i = 0; i < keys.size(); ++i) {
+    std::cout << keys[i];
+    if (i < keys.size() - 1) {
+      std::cout << ", ";
+    }
+  }
+  std::cout << "]" << std::endl;
+};
+
 struct Task3Stats {
   double time_taken = 0;
   int num_results = 0;
@@ -13,8 +29,6 @@ struct Task3Stats {
 
 Task3Stats do_bruteforce_scan(Storage *storage, int block_count);
 Task3Stats do_bp_tree(BPlusTree *tree);
-
-void float_format() {}
 
 void task_3(BPlusTree *tree, Storage *storage, int block_count) {
   std::cout << "Task 3: Index Scan vs Brute-Force Linear Scan ('FG_PCT_HOME' "
