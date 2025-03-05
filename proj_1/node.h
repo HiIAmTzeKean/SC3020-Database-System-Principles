@@ -1,33 +1,89 @@
 #ifndef NODE_H
 #define NODE_H
 
+#include "storage/storage.h"
+#include <assert.h>
 #include <optional>
 #include <vector>
 
+constexpr int IN_BLOCK_RECORDS = 8;
+constexpr int MAX_OVERFLOW_BLOCKS = 8;
+
 struct RecordPointer {
+  int block_id;
   int offset;
+};
+
+struct NodePointer {
+  int block_id;
+
+  NodePointer() : block_id(-1) {};
+  NodePointer(int block_id) : block_id(block_id) {};
+  NodePointer(std::istream &stream);
+  int serialize(std::ostream &stream) const;
+};
+
+struct OverflowBlockPointer {
   int block_id;
 };
+
+struct OverflowBlock {
+  int id = -1;
+  std::vector<RecordPointer> records{};
+  std::optional<OverflowBlockPointer> next{};
+
+  OverflowBlock() {};
+  OverflowBlock(int block_id, std::istream &stream);
+  int serialize(std::ostream &stream) const;
+  static size_t max_record_count(size_t block_size);
+};
+
+struct NodeRecords {
+  int record_count;
+  RecordPointer records[IN_BLOCK_RECORDS];
+  std::optional<OverflowBlockPointer> more_records;
+
+  NodeRecords() {};
+  NodeRecords(std::istream &stream);
+  int serialize(std::ostream &stream) const;
+  void clear();
+  void push_back(Storage *storage, RecordPointer ptr);
+};
+
+class Node;
+NodePointer create_in_storage(Storage *storage, Node *node);
+Node *fetch_from_storage(Storage *storage, NodePointer ptr);
 
 class Node {
 public:
   // Create empty leaf node.
   Node(int degree) : Node(degree, true) {};
   // Create internal node.
-  Node(int degree, Node *a, float key, Node *b);
+  Node(int degree, NodePointer a, float key, NodePointer b);
   ~Node();
 
+  Node(int block_id, std::istream &stream);
+
+  int id = -1;
+  int serialize(std::ostream &stream) const;
+
   struct CreatedSibling {
-    Node *node;
+    NodePointer node;
     float key;
   };
 
   // Inserts the provided record into self. If it is not possible to fit in the
   // current node, the sibling node created will be returned.
-  std::optional<CreatedSibling> insert(float key, RecordPointer record);
+  std::optional<CreatedSibling> insert(Storage *storage, float key,
+                                       RecordPointer record);
 
   inline bool is_leaf() const { return this->m_is_leaf; };
-  inline Node *next_node() const { return this->m_next; };
+  inline Node *next_node(Storage *storage) const {
+    assert(this->m_is_leaf);
+    return this->m_next.has_value()
+               ? fetch_from_storage(storage, this->m_next.value())
+               : nullptr;
+  };
 
   size_t key_count() const;
   float key_at(int index) const;
@@ -37,23 +93,25 @@ public:
   // key is.
   size_t search_key(float key) const;
 
-  std::vector<RecordPointer> records_at(int index) const;
-  size_t record_count_at(int index) const;
+  std::vector<RecordPointer> records_at(Storage *storage, int index) const;
   size_t leaf_entry_count() const;
 
-  Node *child_node_at(int index) const;
+  Node *child_node_at(Storage *storage, int index) const;
   size_t child_node_count() const;
 
 private:
   Node(int degree, bool is_leaf);
   static Node create_empty_internal_node();
 
-  std::optional<CreatedSibling> insert_leaf(float key, RecordPointer record);
-  std::optional<CreatedSibling> insert_internal(float key,
+  std::optional<CreatedSibling> insert_leaf(Storage *storage, float key,
+                                            RecordPointer record);
+  std::optional<CreatedSibling> insert_internal(Storage *storage, float key,
                                                 RecordPointer record);
 
-  Node *split_leaf_child(float key, RecordPointer record);
-  CreatedSibling split_internal_child(float key, Node *record);
+  CreatedSibling split_leaf_child(Storage *storage, float key,
+                                  RecordPointer record);
+  CreatedSibling split_internal_child(Storage *storage, float key,
+                                      NodePointer record);
 
   bool m_is_leaf = 0;
   int m_degree = 0;
@@ -61,11 +119,11 @@ private:
 
   float *m_keys;
   union {
-    Node **m_node_values;
+    NodePointer *m_node_values;
 
     struct {
-      std::vector<RecordPointer> *m_record_values;
-      Node *m_next;
+      NodeRecords *m_record_values;
+      std::optional<NodePointer> m_next;
     };
   };
 };

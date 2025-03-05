@@ -13,7 +13,6 @@ int floor_div(int a, int b);
 class BPlusTree {
 public:
   BPlusTree(Storage *storage, int degree);
-  ~BPlusTree();
 
   class Iterator {
   public:
@@ -49,7 +48,7 @@ public:
 
 private:
   int m_degree = 0;
-  Node *m_root = nullptr;
+  NodePointer m_root;
 };
 
 #endif // BP_TREE_H

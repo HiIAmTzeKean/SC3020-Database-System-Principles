@@ -1,12 +1,13 @@
 #include "bp_tree.h"
+#include "storage/data_block.h"
 #include "storage/storage.h"
 #include "task.h"
 #include <assert.h>
 
 int main() {
   std::string inputFile = "games.txt";
-  auto storage = Storage("data/block_");
-  std::vector<Record> records = storage.read_records_from_file(inputFile);
+  auto storage = Storage("data/block_", 0, 0, 0);
+  std::vector<Record> records = read_records_from_file(inputFile);
 
   if (records.empty()) {
     std::cerr << "No records found in the file.\n";
@@ -19,15 +20,16 @@ int main() {
 
   BPlusTree tree = BPlusTree(&storage, 5);
   for (int i = 0; i < block_count; i++) {
-    Block b = *storage.get_data_block(i);
+    DataBlock b = *storage.get_data_block(i);
     int record_offset = 0;
     for (Record &record : b.records) {
-      RecordPointer recordPointer = {.offset = record_offset, .block_id = b.id};
+      RecordPointer recordPointer = {.block_id = b.id, .offset = record_offset};
       tree.insert(record.fg_pct_home, recordPointer);
       ++record_offset;
     };
   }
   std::cout << std::endl;
+  storage.flush_blocks();
 
   // Sanity check that the tree is sorted.
   float prev_key = -10000;
@@ -37,7 +39,7 @@ int main() {
   }
 
   std::cout << "Task 1: Storage" << std::endl;
-  storage.report_statistics();
+  task_1(&storage);
   std::cout << std::endl;
 
   std::cout << "Task 2: B-Tree Statistics" << std::endl;

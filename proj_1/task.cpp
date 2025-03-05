@@ -1,6 +1,25 @@
 #include "bp_tree.h"
+#include "storage/data_block.h"
 #include <assert.h>
 #include <iomanip>
+
+void task_1(Storage *storage) {
+  int records_per_block = DataBlock::max_records(storage->block_size);
+  int record_count = 0;
+
+  for (auto i = 0; i < storage->loaded_data_block_count(); ++i) {
+    record_count += storage->get_data_block(i)->records.size();
+  }
+
+  std::cout << "Record size: " << Record::size() << " bytes ("
+            << Record::size_unpadded() << " bytes without padding)"
+            << std::endl;
+  std::cout << "Number of Records: " << record_count << std::endl;
+  std::cout << "Number of Records per Block: " << records_per_block
+            << std::endl;
+  std::cout << "Number of Data Blocks: " << storage->loaded_data_block_count()
+            << std::endl;
+}
 
 void task_2(BPlusTree *tree) {
   std::cout << "Parameter N: " << tree->get_degree() << std::endl;
@@ -97,7 +116,7 @@ Task3Stats do_bruteforce_scan(Storage *storage, int block_count) {
   auto start_time = std::chrono::high_resolution_clock::now();
 
   for (int i = 0; i < block_count; i++) {
-    Block *b = storage->get_data_block(i);
+    DataBlock *b = storage->get_data_block(i);
     for (Record record : b->records) {
       if (record.fg_pct_home >= 0.6 && record.fg_pct_home <= 0.9) {
         sum += record.fg_pct_home;
