@@ -7,6 +7,7 @@
 #include <vector>
 
 const int KEY_SIZE = 4;
+const int MAX_HEIGHT = 20;
 
 int ceil_div(int a, int b);
 int floor_div(int a, int b);
@@ -35,18 +36,16 @@ public:
   private:
     Record *record() const;
 
-    Node *current;
-    int index;
-    int vector_index;
-    const BPlusTree *tree;
+    Node *m_current;
+    int m_index;
+    int m_vector_index;
+    const BPlusTree *m_tree;
   };
 
   Iterator begin() const;
   Iterator search(float key) const;
   Iterator end() const;
 
-  int get_index(float key, Node *node);
-  Node *search_leaf_node(float key) const;
   void insert(float key, RecordPointer value);
   void print();
   void print_node(Node *node, int level);
@@ -79,12 +78,28 @@ public:
   // current node, the sibling node created will be returned.
   std::optional<CreatedSibling> insert(float key, RecordPointer record);
 
+  inline bool is_leaf() const { return this->m_is_leaf; };
+  inline Node *next_node() const { return this->m_next; };
+
+  size_t key_count() const;
+  float key_at(int index) const;
+  // Returns the index where the smallest value that is larger or equal to the
+  // key is located. For internal nodes, this returns the index of the node
+  // where the key can likely be found. For leaf nodes, this returns where the
+  // key is.
+  size_t search_key(float key) const;
+
+  std::vector<RecordPointer> records_at(int index) const;
+  size_t record_count_at(int index) const;
+  size_t leaf_entry_count() const;
+
+  Node *child_node_at(int index) const;
+  size_t child_node_count() const;
+
 private:
   Node(int degree, bool is_leaf);
   static Node create_empty_internal_node();
 
-  friend class BPlusTree;
-  friend class BPlusTree::Iterator;
   std::optional<CreatedSibling> insert_leaf(float key, RecordPointer record);
   std::optional<CreatedSibling> insert_internal(float key,
                                                 RecordPointer record);
@@ -92,15 +107,15 @@ private:
   Node *split_leaf_child(float key, RecordPointer record);
   CreatedSibling split_internal_child(float key, Node *record);
 
-  bool is_leaf = 0;
-  int degree = 0;
-  int size = 0;
-  float *keys = nullptr;
+  bool m_is_leaf = 0;
+  int m_degree = 0;
+  int m_size = 0;
+  float *m_keys = nullptr;
+  Node **m_node_values = nullptr;
 
-  Node **node_values = nullptr;
-  std::vector<std::vector<RecordPointer>> record_values;
+  Node *m_next = nullptr;
 
-  Node *next = nullptr;
+  std::vector<std::vector<RecordPointer>> m_record_values;
 };
 
 #endif // BP_TREE_H
