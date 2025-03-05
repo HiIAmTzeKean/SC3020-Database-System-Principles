@@ -44,7 +44,7 @@
 # Built Visual Studio Code Extensions
 *.vsix
 
-**/data/
+*.dat
 *.plist
 *.yml
 **/*.dSYM/
