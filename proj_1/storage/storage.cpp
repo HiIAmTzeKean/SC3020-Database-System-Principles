@@ -101,7 +101,7 @@ int Storage::get_system_block_size(void) {
   block_size = res;
   if (block_size == -1) {
     block_size = 4096;
-    std::cout << "Failed to get system block size, setting block size to "
+    std::cout << "Failed to get system block size, setting block size to "z
                  "default of 4096 bytes."
               << std::endl;
   }
