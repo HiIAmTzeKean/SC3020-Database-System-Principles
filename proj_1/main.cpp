@@ -4,8 +4,24 @@
 #include "task.h"
 #include <assert.h>
 
-int main() {
-  std::string inputFile = "games.txt";
+int main(int argc, char *argv[]) {
+  if (argc < 3) {
+    std::cerr << "Usage: " << argv[0] << " <BPlusTree degree> <input file>" << std::endl;
+    return 1;
+  }
+
+  int degree = std::stoi(argv[1]);
+  if (degree <= 0) {
+    std::cerr << "Invalid BPlusTree degree. Defaulting to optimal value of 9." << std::endl;
+    degree = 9;
+  }
+
+  std::string inputFile = argv[2];
+  if (inputFile != "games.txt" && inputFile != "games_sorted.txt") {
+    std::cerr << "Invalid input file. It must be either 'games.txt' or 'games_sorted.txt'." << std::endl;
+    return 1;
+  }
+
   auto storage = Storage("data/block_", 0, 0, 0);
   std::vector<Record> records = read_records_from_file(inputFile);
 
@@ -18,7 +34,7 @@ int main() {
   std::cout << "Step 0: Construct Database and Tree" << std::endl;
   auto block_count = storage.write_data_blocks(records);
 
-  BPlusTree tree = BPlusTree(&storage, 5);
+  BPlusTree tree = BPlusTree(&storage, degree);
   for (int i = 0; i < block_count; i++) {
     DataBlock b = *storage.get_data_block(i);
     int record_offset = 0;
