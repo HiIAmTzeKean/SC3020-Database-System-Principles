@@ -1,0 +1,70 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\begin{document}
+
+\begin{algorithm}
+\caption{BTreeSearch(T, k)}
+\begin{algorithmic}[1]
+\State $x \gets T.root$
+\While{$x.leaf$ is false}
+    \State $i \gets 1$
+    \While{$i \leq x.size$ and $k > x.key_i$}
+        \State $i \gets i + 1$
+    \EndWhile
+    \State $x \gets x.childnode_i$
+    \State DiskRead$(x)$
+\EndWhile
+\State $i \gets 1$
+\While{$i \leq x.size$ and $k > x.key_i$}
+    \State $i \gets i + 1$
+\EndWhile
+\If{$i \leq x.size$ and $k = x.key_i$}
+    \State \textbf{return} $(x, i)$
+\Else
+    \State \textbf{return} NIL
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{BTreeRangeSearch(T, low, high)}
+\begin{algorithmic}[1]
+\State $x \gets T.root$
+\While{$x.leaf$ is false}
+    \State $i \gets 1$
+    \While{$i \leq x.size$ and $low > x.key_i$}
+        \State $i \gets i + 1$
+    \EndWhile
+    \State $x \gets x.childnode_i$
+    \State DiskRead$(x)$
+\EndWhile
+\State $i \gets 1$
+\While{$i \leq x.size$ and $low > x.key_i$}
+    \State $i \gets i + 1$
+\EndWhile
+\State \textbf{Initialize} $result \gets []$
+\While{$i \leq x.size$ and $x.key_i \leq high$}
+    \State \textbf{Append} $(x, i)$ to $result$
+    \State $i \gets i + 1$
+\EndWhile
+\State DiskRead$(x.nextLeaf)$
+\State $nextLeaf \gets x.nextLeaf$
+\While{$nextLeaf \neq NIL$ and $nextLeaf.key_1 \leq high$}
+    \State $x \gets nextLeaf$
+    \State $i \gets 1$
+    \While{$i \leq x.size$ and $x.key_i \leq high$}
+        \State \textbf{Append} $(x, i)$ to $result$
+        \State $i \gets i + 1$
+    \EndWhile
+    \State DiskRead$(x.nextLeaf)$
+    \State $nextLeaf \gets x.nextLeaf$
+\EndWhile
+\State \textbf{return} $result$
+\end{algorithmic}
+\end{algorithm}
+
+
+\end{document}

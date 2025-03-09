@@ -1,66 +1,60 @@
 #ifndef STORAGE_H
 #define STORAGE_H
 
-#include <cstring>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <vector>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <map>
+#include <string>
+#include <vector>
 
-#ifdef _WIN32
-#include <Windows.h>
-#elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
-#include <unistd.h>
-#else
-#include <cstdio>
-#endif
+#include "block_storage_impl.h"
+#include "data_block.h"
 
-struct Record {
-    uint32_t game_date_est; // 4 bytes (DDMMYYYY)
-    uint32_t team_id_home; // 4 bytes (0-4,294,967,295)
-    float fg_pct_home; // 4 bytes
-    float ft_pct_home; // 4 bytes
-    float fg3_pct_home; // 4 bytes
-    uint16_t ast_home; // 2 bytes (0-65,535)
-    uint16_t reb_home; // 2 bytes (0-65,535)
-    uint16_t pts_home; // 2 bytes (0-65,535)
-    bool home_team_wins; // 1 byte
+bool stream_just_ended(std::istream &stream);
 
-    static int sizeUnpadded(); // 27 bytes
-    static int size(); // 28 bytes (actual size w/ padding)
+struct OverflowBlock;
+class Node;
+
+class Storage {
+public:
+  int number_of_records = 0;
+
+  int block_size;
+
+  Storage(const std::string &storage_location, int data_block_count,
+          int index_block_count, int overflow_block_count)
+      : block_size(get_system_block_size()),
+        m_data_blocks(storage_location + "data_", data_block_count),
+        m_index_blocks(storage_location + "index_", index_block_count),
+        m_overflow_blocks(storage_location + "overflow_",
+                          overflow_block_count) {
+    m_buffer = new char[block_size]{};
+  };
+  ~Storage() { delete[] m_buffer; };
+
+  DataBlock *get_data_block(int id);
+  Node *get_index_block(int id);
+  OverflowBlock *get_overflow_block(int id);
+
+  int track_new_data_block(DataBlock *b);
+  int track_new_index_block(Node *b);
+  int track_new_overflow_block(OverflowBlock *b);
+
+  size_t loaded_index_block_count() const;
+  size_t loaded_data_block_count() const;
+  void flush_blocks();
+
+  int write_data_blocks(const std::vector<Record> &records);
+
+private:
+  int get_system_block_size();
+
+  BlockStorage<DataBlock> m_data_blocks;
+  BlockStorage<Node> m_index_blocks;
+  BlockStorage<OverflowBlock> m_overflow_blocks;
+  char *m_buffer;
 };
 
-struct Block {
-    std::vector<Record> records;
-
-    static int maxRecordsPerBlock();
-
-    void serialize(char *buffer, int *bytesToWrite);
-
-    void deserialize(char *buffer, std::vector<Record> &records, int bytesToRead);
-};
-
-struct Storage {
-    static int BlockSize;
-
-    Storage() {
-        BlockSize = getSystemBlockSizeSetting();
-    };
-
-    std::vector<Record> readRecordsFromFile(const std::string &filename);
-
-    void writeDatabaseFile(const std::string &filename, const std::vector<Record> &records);
-
-    void readDatabaseFile(const std::string &filename, std::vector<Record> &records);
-
-    void reportStatistics(const std::vector<Record> &records);
-
-    void bruteForceScan(std::vector<Record> const &records, float min, float max);
-
-    int getSystemBlockSizeSetting(void);
-};
-
-#endif  // STORAGE_H
+#endif // STORAGE_H
