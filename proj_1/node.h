@@ -67,6 +67,8 @@ public:
   int id = -1;
   int serialize(std::ostream &stream) const;
 
+  static size_t max_record_count(size_t block_size);
+
   struct CreatedSibling {
     NodePointer node;
     float key;

@@ -217,14 +217,26 @@ int Node::serialize(std::ostream &stream) const {
   return size;
 }
 
+size_t Node::max_record_count(size_t block_size) {
+  auto header_size = 1 + 2 + 2;
+  auto key_size = 4;
+  auto node_record_size = 1 + IN_BLOCK_RECORDS * (4 + 2) + 1 + 4;
+  auto m_next_size = 1 + 4;
+  // block_size >= header_size + key_size * N + node_record_size * (N+1) +
+  // m_next_size N * (key_size + node_record_size) <= block_size - header_size -
+  // node_record_size - m_next_size Hence:
+  return (block_size - header_size - node_record_size - m_next_size) /
+         (key_size + node_record_size);
+}
+
 // NOTE: create_in_storage takes over ownership of the node pointer.
 NodePointer create_in_storage(Storage *storage, Node *node) {
   return NodePointer(storage->track_new_index_block(node));
-};
+}
 
 Node *fetch_from_storage(Storage *storage, NodePointer ptr) {
   return storage->get_index_block(ptr.block_id);
-};
+}
 
 size_t Node::key_count() const {
   if (this->m_is_leaf)

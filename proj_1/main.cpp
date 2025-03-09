@@ -6,23 +6,35 @@
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
-    std::cerr << "Usage: " << argv[0] << " <BPlusTree degree> <input file>" << std::endl;
-    return 1;
-  }
-
-  int degree = std::stoi(argv[1]);
-  if (degree <= 0) {
-    std::cerr << "Invalid BPlusTree degree. Defaulting to optimal value of 9." << std::endl;
-    degree = 9;
-  }
-
-  std::string inputFile = argv[2];
-  if (inputFile != "games.txt" && inputFile != "games_sorted.txt") {
-    std::cerr << "Invalid input file. It must be either 'games.txt' or 'games_sorted.txt'." << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <BPlusTree degree> <input file>"
+              << std::endl;
     return 1;
   }
 
   auto storage = Storage("data/block_", 0, 0, 0);
+  auto optimal_degree = Node::max_record_count(storage.block_size);
+  int degree = std::stoi(argv[1]);
+  if (degree <= 1) {
+    std::cerr << "Invalid BPlusTree degree. Defaulting to optimal value of "
+              << optimal_degree << "." << std::endl;
+    degree = optimal_degree;
+  } else if (degree != optimal_degree) {
+    std::cerr << "Using degree " << degree
+              << " as requested instead of optimal value of " << optimal_degree
+              << "." << std::endl;
+  } else {
+    std::cerr << "Using degree " << degree << " as requested (optimal)."
+              << std::endl;
+  }
+
+  std::string inputFile = argv[2];
+  if (inputFile != "games.txt" && inputFile != "games_sorted.txt") {
+    std::cerr << "Invalid input file. It must be either 'games.txt' or "
+                 "'games_sorted.txt'."
+              << std::endl;
+    return 1;
+  }
+
   std::vector<Record> records = read_records_from_file(inputFile);
 
   if (records.empty()) {
