@@ -62,9 +62,6 @@ void Storage::flush_blocks() {
 }
 
 void Storage::flush_cache_without_writing() {
-  this->m_index_blocks.write_all_cached_blocks();
-  this->m_data_blocks.write_all_cached_blocks();
-  this->m_overflow_blocks.write_all_cached_blocks();
   this->m_index_blocks.delete_all_blocks_without_writing();
   this->m_data_blocks.delete_all_blocks_without_writing();
   this->m_overflow_blocks.delete_all_blocks_without_writing();
