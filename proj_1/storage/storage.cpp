@@ -61,6 +61,15 @@ void Storage::flush_blocks() {
   this->m_overflow_blocks.delete_all_blocks_without_writing();
 }
 
+void Storage::flush_cache_without_writing() {
+  this->m_index_blocks.write_all_cached_blocks();
+  this->m_data_blocks.write_all_cached_blocks();
+  this->m_overflow_blocks.write_all_cached_blocks();
+  this->m_index_blocks.delete_all_blocks_without_writing();
+  this->m_data_blocks.delete_all_blocks_without_writing();
+  this->m_overflow_blocks.delete_all_blocks_without_writing();
+}
+
 DataBlock *Storage::get_data_block(int id) {
   return this->m_data_blocks.get(id);
 }
@@ -99,6 +108,7 @@ int Storage::get_system_block_size(void) {
 #elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
   long res = sysconf(_SC_PAGESIZE);
   block_size = res;
+  block_size = 4096;
   if (block_size == -1) {
     block_size = 4096;
     std::cout << "Failed to get system block size, setting block size to "

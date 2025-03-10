@@ -45,7 +45,7 @@ public:
   size_t loaded_index_block_count() const;
   size_t loaded_data_block_count() const;
   void flush_blocks();
-
+  void flush_cache_without_writing();
   int write_data_blocks(const std::vector<Record> &records);
 
 private:

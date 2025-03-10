@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     };
   }
   std::cout << std::endl;
-  storage.flush_blocks();
+  storage.flush_cache_without_writing();
 
   // Sanity check that the tree is sorted.
   float prev_key = -10000;
