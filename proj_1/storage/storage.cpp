@@ -105,7 +105,6 @@ int Storage::get_system_block_size(void) {
 #elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
   long res = sysconf(_SC_PAGESIZE);
   block_size = res;
-  block_size = 4096;
   if (block_size == -1) {
     block_size = 4096;
     std::cout << "Failed to get system block size, setting block size to "
