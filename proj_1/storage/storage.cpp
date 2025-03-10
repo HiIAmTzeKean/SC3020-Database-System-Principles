@@ -61,6 +61,12 @@ void Storage::flush_blocks() {
   this->m_overflow_blocks.delete_all_blocks_without_writing();
 }
 
+void Storage::flush_cache_without_writing() {
+  this->m_index_blocks.delete_all_blocks_without_writing();
+  this->m_data_blocks.delete_all_blocks_without_writing();
+  this->m_overflow_blocks.delete_all_blocks_without_writing();
+}
+
 DataBlock *Storage::get_data_block(int id) {
   return this->m_data_blocks.get(id);
 }
