@@ -112,7 +112,7 @@ Task3Stats do_bruteforce_scan(Storage *storage, int block_count) {
   float sum = 0;
   int num_results = 0;
 
-  storage->flush_blocks();
+  storage->flush_cache_without_writing();
   auto start_time = std::chrono::high_resolution_clock::now();
 
   for (int i = 0; i < block_count; i++) {
@@ -143,7 +143,7 @@ Task3Stats do_bp_tree(BPlusTree *tree) {
   float sum = 0;
   int num_results = 0;
 
-  tree->storage->flush_blocks();
+  tree->storage->flush_cache_without_writing();
   auto start_time = std::chrono::high_resolution_clock::now();
 
   for (auto it = tree->search(0.6); it != tree->end(); ++it) {
