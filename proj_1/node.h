@@ -120,14 +120,9 @@ private:
   int m_size = 0;
 
   float *m_keys;
-  union {
-    NodePointer *m_node_values;
-
-    struct {
-      NodeRecords *m_record_values;
-      std::optional<NodePointer> m_next;
-    };
-  };
+  NodePointer *m_node_values;
+  NodeRecords *m_record_values;
+  std::optional<NodePointer> m_next;
 };
 
 #endif // NODE_H
