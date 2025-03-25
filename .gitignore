@@ -46,7 +46,7 @@
 
 *.dat
 *.plist
-*.yml
+#*.yml
 **/*.dSYM/
 **/*.DS_Store
 
