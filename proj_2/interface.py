@@ -7,11 +7,20 @@ default_session_states = {
     "page": "login",
     "connection": None,
     "db_location": "Cloud",
-    "db_schema": "IMDB"
+    "db_schema": "IMDB",
+    "selected_example_query": "",
+    "pipe_syntax_result": ""
 }
 for key, value in default_session_states.items():
     if key not in st.session_state:
         st.session_state[key] = value
+
+# TODO: setup examples
+example_queries = {
+    "1 - Find XXX": "SELECT * FROM xxx;",
+    "2 - Find YYY": "SELECT * FROM yyy;",
+    "3 - Find ZZZ": "SELECT * FROM zzz;"
+}
 
 
 def login():
@@ -117,7 +126,33 @@ def main():
             st.session_state[key] = value
         st.rerun()
 
-    st.title("Main")
+    col1, col2 = st.columns(2, gap="large")
+    with col1:
+        # TODO (nice-to-have): query validation, syntax highlighting
+        sql_query = st.text_area(
+            label="SQL Query",
+            value=st.session_state.selected_example_query.strip()
+        )
+
+        col1_1, col1_2 = st.columns([1, 3], gap="medium")
+        with col1_1:
+            if st.button("Run Query"):
+                st.session_state.pipe_syntax_result = f"TODO pipe syntax result of '{sql_query}'"
+        with col1_2:
+            with st.expander(label="Select an Example Query", expanded=False):
+                for ex in example_queries:
+                    if st.button(ex):
+                        st.session_state.selected_example_query = example_queries.get(
+                            ex)
+
+    with col2:
+        pipe_syntax_result = st.text_area(
+            label="Pipe Syntax Result",
+            value=st.session_state.pipe_syntax_result,
+            disabled=True
+        )
+
+    st.subheader("QEP Visualizer")
 
 
 # Page navigation
