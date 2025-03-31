@@ -35,7 +35,7 @@ class PipeSyntax:
     def __repr__(self) -> str:
         return f"PipeSyntax({self.query})"
 
-class QueryExecutionPlan:
+class QueryExecutionPlanGraph:
     def __init__(self, query: str) -> None:
         self.query = query
         self.execution_plan:str 
@@ -85,7 +85,7 @@ class PipeSyntaxParser:
         """
         return PipeSyntax(query)
     
-    def get_execution_plan(self, query: str) -> QueryExecutionPlan:
+    def get_execution_plan_graph(self, query: str) -> QueryExecutionPlanGraph:
         """
         Get the execution plan for a given query.
         
@@ -93,8 +93,8 @@ class PipeSyntaxParser:
             query (str): The query string to generate the execution plan for.
         
         Returns:
-            QueryExecutionPlan: The execution plan object.
+            QueryExecutionPlanGraph: The execution plan object.
         """
-        return QueryExecutionPlan(query)
+        return QueryExecutionPlanGraph(query)
     
     
