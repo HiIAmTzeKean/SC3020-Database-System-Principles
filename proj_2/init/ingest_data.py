@@ -56,6 +56,18 @@ def connect():
         dbname=PG_DB, user=PG_USER, password=PG_PASS, host=PG_HOST, port=PG_PORT
     )
 
+def drop_existing_tables():
+    with connect() as conn:
+        logging.info(f"Clean up existing tables to start on new ingestion...")
+        with conn.cursor() as cur:
+            for dataset in DATASETS:
+                table_name = dataset.replace(".", "_")
+                try:
+                    cur.execute(f"DROP TABLE IF EXISTS {table_name} CASCADE;")
+                    conn.commit()
+                except Exception as e:
+                    logging.warning(f"Failed to drop table {table_name}: {e}")
+
 
 def import_dataset(dataset):
     sql_file = os.path.join(SCHEMA_DIR, f"{dataset}.sql")
@@ -69,6 +81,7 @@ def import_dataset(dataset):
         return
 
     with connect() as conn:
+        logging.info(f"Importing data, this will take around 30 minutes.")
         with conn.cursor() as cur:
             logging.info(f"Importing schema: {dataset}")
             with open(sql_file, "r", encoding="utf-8") as sf:
@@ -99,6 +112,9 @@ def import_dataset(dataset):
                 )
             conn.commit()
 
+# Drop existing tables before running the import
+# Ensure that ingestion starts on a clean state
+drop_existing_tables()
 
 # Main execution
 for dataset in DATASETS:
