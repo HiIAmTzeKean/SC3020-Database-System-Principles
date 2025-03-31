@@ -149,10 +149,10 @@ def main():
                         st.error(e)
         with col1_2:
             with st.expander(label="Select an Example Query", expanded=False):
-                for ex in example_queries:
-                    if st.button(ex):
-                        st.session_state.selected_example_query = example_queries.get(
-                            ex)
+                for query_name, query in example_queries.items():
+                    if st.button(query_name):
+                        st.session_state.selected_example_query = query
+                        st.rerun()
 
     with col2:
         pipe_syntax_result = st.text_area(
