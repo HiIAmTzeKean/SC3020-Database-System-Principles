@@ -1,15 +1,17 @@
 import streamlit as st
+from preprocessing import Database
 
 st.set_page_config(page_title="QEP Visualizer", layout="wide")
 
 # Initialize session states
 default_session_states = {
     "page": "login",
-    "connection": None,
+    "db_connection": None,
     "db_location": "Cloud",
     "db_schema": "IMDB",
     "selected_example_query": "",
-    "pipe_syntax_result": ""
+    "pipe_syntax_result": "",
+    "qep_results": ""
 }
 for key, value in default_session_states.items():
     if key not in st.session_state:
@@ -17,7 +19,7 @@ for key, value in default_session_states.items():
 
 # TODO: setup examples
 example_queries = {
-    "1 - Find XXX": "SELECT * FROM xxx;",
+    "1 - Get first 10 rows from title_basics table": "SELECT * FROM title_basics LIMIT 10;",
     "2 - Find YYY": "SELECT * FROM yyy;",
     "3 - Find ZZZ": "SELECT * FROM zzz;"
 }
@@ -92,12 +94,7 @@ def login():
                 st.error(f"One or more fields are empty.")
             else:
                 try:
-                    db_manager = None  # TODO: connect using db_params
-                    # db_manager.connect()
-                    # with db_manager.conn.cursor() as cursor:
-                    #     cursor.execute("SET max_parallel_workers_per_gather = 0;")
-                    # db_manager.conn.commit()
-                    # st.session_state.connection = db_manager.conn
+                    st.session_state.db_connection = Database()  # TODO: connect using db_params
 
                     st.session_state.page = "main"
                     st.rerun()
@@ -143,6 +140,13 @@ def main():
         with col1_1:
             if st.button("Run Query"):
                 st.session_state.pipe_syntax_result = f"TODO pipe syntax result of '{sql_query}'"
+                if st.session_state.db_connection:
+                    # TODO: handle QEP results
+                    try:
+                        st.session_state.qep_results = st.session_state.db_connection.get_qep(
+                            sql_query)
+                    except Exception as e:
+                        st.error(e)
         with col1_2:
             with st.expander(label="Select an Example Query", expanded=False):
                 for ex in example_queries:
@@ -158,6 +162,9 @@ def main():
         )
 
     st.subheader("QEP Visualizer")
+    # TODO: remove after testing
+    if st.session_state.qep_results:
+        st.write(st.session_state.qep_results)
 
 
 # Page navigation
