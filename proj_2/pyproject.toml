@@ -3,9 +3,13 @@ name = "project-2"
 version = "0.1.0"
 description = "SC3020 Database System project 2"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "psycopg2>=2.9.10",
     "psycopg2-binary>=2.9.10",
     "streamlit>=1.43.2",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["archive", "data", "docs", "venv"]
