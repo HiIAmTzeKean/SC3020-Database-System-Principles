@@ -104,23 +104,23 @@ def login():
 
 
 def main():
-    # TODO: fetch dynamically
-    st.sidebar.header("Current Database: TPC-H")
+    db_name = ""
+    if st.session_state.db_connection:
+        # TODO: dynamically fetch DB name
+        # db_name = st.session_state.db_connection.get_db_name()
+        db_name = "imdb"
+    st.sidebar.header(f"Current Database: {db_name}")
 
-    # TODO: accordions to expand/hide schema hierarchy
     st.sidebar.subheader("DB Schema")
-    # TODO: fetch dynamically.
-    db_schema = """
-        - customer
-        - lineitem
-        - nation
-        - orders
-        - part
-        - partsupp
-        - region
-        - supplier
-    """
-    st.sidebar.text(db_schema)
+    if st.session_state.db_connection:
+        # TODO: dynamically fetch DB schema
+        # db_schema = st.session_state.db_connection.get_db_schema()
+        db_schema = {"name_basics": {"nconst": "text", "primaryname": "text", "birthyear": "integer", "deathyear": "integer", "primaryprofession": "text", "knownfortitles": "text"}, "title_akas": {"titleid": "text", "ordering": "integer", "title": "text", "region": "text", "language": "text", "types": "text", "attributes": "text", "isoriginaltitle": "boolean"}, "title_basics": {"tconst": "text", "titletype": "text", "primarytitle": "text", "originaltitle": "text", "isadult": "boolean", "startyear": "integer",
+                                                                                                                                                                                                                                                                                                                                                                                             "endyear": "integer", "runtimeminutes": "integer", "genres": "text"}, "title_crew": {"tconst": "text", "directors": "text", "writers": "text"}, "title_episode": {"tconst": "text", "parenttconst": "text", "seasonnumber": "integer", "episodenumber": "integer"}, "title_principals": {"tconst": "text", "ordering": "integer", "nconst": "text", "category": "text", "job": "text", "characters": "text"}, "title_ratings": {"tconst": "text", "averagerating": "double precision", "numvotes": "integer"}}
+        for table, schema in db_schema.items():
+            with st.sidebar.expander(table):
+                for attribute, data_type in schema.items():
+                    st.markdown(f"- **{attribute}**: {data_type}")
 
     if st.sidebar.button("Logout"):
         # Reset session states
