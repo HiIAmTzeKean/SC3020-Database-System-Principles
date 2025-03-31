@@ -45,16 +45,15 @@ def login():
     if st.session_state.db_location == "Cloud":
         # TODO: set up cloud db & store credentials in secrets
         db_params = {
-            "dbname": "",
-            "user": "",
-            "password": "",
-            "host": "",
-            "port": "",
+            "dbname": "imdb",
+            "user": "group1",
+            "password": "group1",
+            "host": "localhost",
+            "port": "5432",
             "sslmode": "require"
         }
     elif st.session_state.db_location == "Local":
         st.markdown("**Local Database Credentials**")
-        # TODO: empty input validation
         dbname = st.text_input(
             label="Database Name",
             placeholder="Enter database name"
@@ -87,18 +86,22 @@ def login():
         }
 
     if st.button("Login"):
-        try:
-            db_manager = None  # TODO: connect using db_params
-            # db_manager.connect()
-            # with db_manager.conn.cursor() as cursor:
-            #     cursor.execute("SET max_parallel_workers_per_gather = 0;")
-            # db_manager.conn.commit()
-            # st.session_state.connection = db_manager.conn
+        # Empty input validation
+        if any(value.strip() == "" for value in db_params.values()):
+            st.error(f"One or more fields are empty.")
+        else:
+            try:
+                db_manager = None  # TODO: connect using db_params
+                # db_manager.connect()
+                # with db_manager.conn.cursor() as cursor:
+                #     cursor.execute("SET max_parallel_workers_per_gather = 0;")
+                # db_manager.conn.commit()
+                # st.session_state.connection = db_manager.conn
 
-            st.session_state.page = "main"
-            st.rerun()
-        except Exception as e:
-            st.error(f"Failed to connect to the database. Error: {e}")
+                st.session_state.page = "main"
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to connect to the database. Error: {e}")
 
 
 def main():
