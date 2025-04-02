@@ -11,6 +11,9 @@ class QueryPlanNode:
         self.node_type = node_data.get("Node Type")
         self.startup_cost = node_data.get("Startup Cost")
         self.total_cost = node_data.get("Total Cost")
+        self.relation_name = node_data.get("Relation Name")
+        self.sort_key = node_data.get("Sort Key")
+
         self.children = []
         self.data = node_data  # Store the entire node data for potential future use
 
@@ -18,7 +21,7 @@ class QueryPlanNode:
         self.children.append(child_node)
 
     def __str__(self, level: int = 0) -> str:
-        ret = "  " * level + repr(self.node_type) + " (Cost: " + str(self.total_cost) + ")\n"
+        ret = "|>" * level + repr(self.node_type) + " (Cost: " + str(self.total_cost) + ")\n"
         for child in self.children:
             ret += child.__str__(level + 1)
         return ret
@@ -33,7 +36,7 @@ class QueryExecutionPlanGraph:
         self.execution_graph = nx.DiGraph()
 
     def _qep_to_json(self) -> dict:
-        return json.loads(self.qep)
+        return json.loads(self.qep)[0]["Plan"]
 
     def _parse(self) -> None:
         qep_json = self._qep_to_json()
@@ -107,23 +110,47 @@ class PipeSyntax:
         """
         Generate the pipe syntax from the query.
         """
-        # Placeholder for actual implementation
-        self.pipesyntax = self._convert_to_pipe_syntax()
+        if not hasattr(self, "pipesyntax"):
+            logger.info(f"Generating pipe syntax for query: {self.query}")
+            self.qep.generate()
+            self.pipesyntax = self._convert_to_pipe_syntax()
         return self.pipesyntax
+
+    def _traverse_bottom_up(self, node: QueryPlanNode, result_list: list) -> None:
+        """
+        Traverses the query plan graph in a bottom-up manner.
+        """
+        for child in node.children:
+            self._traverse_bottom_up(child, result_list)
+        result_list.append(node.data)
+
+    def _generate_bottom_up_output(self, root_node: QueryPlanNode) -> list:
+        """
+        Generates a bottom-up output from the query plan graph.
+        """
+        result_list = []
+        self._traverse_bottom_up(root_node, result_list)
+        return result_list
 
     def _convert_to_pipe_syntax(self) -> str:
         """
         Convert the qep to pipe syntax.
         """
-        # TODO implement the conversion logic
-        return """
-        FROM customer  
-        |>  LEFT  OUTER  JOIN  orders  ON  c_custkey  =  o_custkey  AND  o_comment  NOT  LIKE  
-        '%unusual%packages%'  
-        |> AGGREGATE COUNT(o_orderkey) c_count GROUP BY c_custkey  
-        |> AGGREGATE COUNT(*) AS custdist GROUP BY c_count  
-        |> ORDER BY custdist DESC, c_count DESC;
-        """
+        parse_list = self._generate_bottom_up_output(self.qep.root)
+        ret = ""
+        for node in parse_list:
+            node_type = node.get("Node Type")
+            if node_type == "Sort":
+                ret += f"{node_type} sort on {node.get('Sort Key')} (Cost: {node.get('Total Cost')})\n"
+            elif node_type == "Seq Scan" or node_type == "Bitmap Heap Scan":
+                ret += f"{node_type} on {node.get('Relation Name')} (Cost: {node.get('Total Cost')})\n"
+            else:
+                ret += f"{node_type} (Cost: {node.get('Total Cost')})\n"
+            ret += "|> "
+        ret = ret[:-4]
+        ret += ";"
+        ret += "\n"
+        return ret
 
     def __str__(self) -> str:
         if not hasattr(self, "pipesyntax"):
@@ -140,7 +167,7 @@ class PipeSyntaxParser:
         self.current_query = None
         self.qep_graph: QueryExecutionPlanGraph
         self.pipesyntax: PipeSyntax
-        
+
         logger.info("PipeSyntaxParser initialized with database.")
 
     def _get_qep(self, query: str) -> str:
@@ -149,7 +176,7 @@ class PipeSyntaxParser:
         with open("sql_qep.txt", "r") as file:
             qep = file.read()
         return qep
-    
+
     def _compute_query(self, query: str) -> None:
         qep = self._get_qep(query)
         self.qep_graph = QueryExecutionPlanGraph(query, qep)
@@ -169,7 +196,7 @@ class PipeSyntaxParser:
         """
         if self.current_query == query:
             return self.pipesyntax
-        
+
         self.current_query = query
         logger.info(f"Getting pipe syntax for query: {query}")
         self._compute_query(query)
@@ -187,7 +214,7 @@ class PipeSyntaxParser:
         """
         if self.current_query == query:
             return self.qep_graph
-        
+
         self.current_query = query
         logger.info(f"Getting qep for query: {query}")
         self._compute_query(query)
