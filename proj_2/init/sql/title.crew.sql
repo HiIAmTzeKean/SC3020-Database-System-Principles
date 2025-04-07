@@ -1,0 +1,5 @@
+CREATE TABLE title_crew (
+    tconst TEXT PRIMARY KEY,
+    directors TEXT,
+    writers TEXT
+);
