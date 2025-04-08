@@ -36,14 +36,6 @@ def login():
         index=db_location_options.index(default_session_states["db_location"])
     )
 
-    # TODO: confirm if we need to switch between the datasets?
-    db_schema_options = ("TPC-H", "IMDB")
-    st.session_state.db_schema = st.radio(
-        label="**Database Schema**",
-        options=db_schema_options,
-        index=db_schema_options.index(default_session_states["db_schema"])
-    )
-
     with st.form("db_login_form"):
         if st.session_state.db_location == "Cloud":
             # TODO: set up cloud db & store credentials in secrets
