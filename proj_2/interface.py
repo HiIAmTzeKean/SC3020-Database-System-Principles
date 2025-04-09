@@ -1,5 +1,12 @@
 import streamlit as st
 from preprocessing import Database
+from pipesyntax import PipeSyntaxParser
+from streamlit_flow import streamlit_flow
+from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
+from streamlit_flow.state import StreamlitFlowState
+from streamlit_flow.layouts import LayeredLayout
+import json
+
 
 st.set_page_config(page_title="QEP Visualizer", layout="wide")
 
@@ -11,7 +18,9 @@ default_session_states = {
     "db_schema": "IMDB",
     "selected_example_query": "",
     "pipe_syntax_result": "",
-    "qep_results": ""
+    "qep_results": "",
+    "pipe_syntax_parser": None,
+    "streamlit_flow_state": None,
 }
 for key, value in default_session_states.items():
     if key not in st.session_state:
@@ -19,8 +28,17 @@ for key, value in default_session_states.items():
 
 # TODO: setup examples
 example_queries = {
-    "1 - Get first 10 rows from title_basics table": "SELECT * FROM title_basics LIMIT 10;",
-    "2 - Find YYY": "SELECT * FROM yyy;",
+    "1 - Get first 10 rows from title_basics table":
+    """
+        SELECT * FROM title_basics LIMIT 10;
+    """,
+    "2 - Get original titles released in non-English languages":
+    """
+        SELECT tb.primarytitle, ta.language
+        FROM title_basics tb
+        JOIN title_akas ta ON tb.tconst = ta.titleid
+        WHERE ta.language != 'en' AND ta.isoriginaltitle = TRUE;
+    """,
     "3 - Find ZZZ": "SELECT * FROM zzz;"
 }
 
@@ -86,7 +104,9 @@ def login():
                 st.error(f"One or more fields are empty.")
             else:
                 try:
-                    st.session_state.db_connection = Database()  # TODO: connect using db_params
+                    db = Database()
+                    st.session_state.db_connection = db  # TODO: connect using db_params
+                    st.session_state.pipe_syntax_parser = PipeSyntaxParser(db)
 
                     st.session_state.page = "main"
                     st.rerun()
@@ -125,19 +145,33 @@ def main():
         # TODO (nice-to-have): query validation, syntax highlighting
         sql_query = st.text_area(
             label="SQL Query",
-            value=st.session_state.selected_example_query.strip()
+            value=st.session_state.selected_example_query.strip(),
+            height=200
         )
 
         col1_1, col1_2 = st.columns([1, 3], gap="medium")
         with col1_1:
             if st.button("Run Query"):
-                st.session_state.pipe_syntax_result = f"TODO pipe syntax result of '{sql_query}'"
+                # Reset
+                st.session_state.qep_results = ""
+                st.session_state.pipe_syntax_result = ""
+                st.session_state.streamlit_flow_state = None
+
                 if st.session_state.db_connection:
                     # TODO: handle QEP results
                     try:
-                        st.session_state.qep_results = st.session_state.db_connection.get_qep(
+                        st.session_state.qep_results = json.loads(st.session_state.db_connection.get_qep(
+                            sql_query))
+                        st.session_state.pipe_syntax_result = st.session_state.pipe_syntax_parser.get_pipe_syntax(
                             sql_query)
+                        qep_graph = st.session_state.pipe_syntax_parser.get_execution_plan_graph(
+                            sql_query)
+                        nodes, edges = qep_graph.visualize()
+                        if not st.session_state.streamlit_flow_state:
+                            st.session_state.streamlit_flow_state = StreamlitFlowState(
+                                nodes, edges)
                     except Exception as e:
+                        # TODO proper error handling
                         st.error(e)
         with col1_2:
             with st.expander(label="Select an Example Query", expanded=False):
@@ -150,13 +184,18 @@ def main():
         pipe_syntax_result = st.text_area(
             label="Pipe Syntax Result",
             value=st.session_state.pipe_syntax_result,
-            disabled=True
+            disabled=True,
+            height=200
         )
 
     st.subheader("QEP Visualizer")
-    # TODO: remove after testing
+
     if st.session_state.qep_results:
-        st.write(st.session_state.qep_results)
+        # TODO fix bug where nodes are not set correctly to layout (reset to 0,0 pos) when same query is re-run
+        streamlit_flow('flow', st.session_state.streamlit_flow_state,
+                       layout=LayeredLayout(direction='right', node_layer_spacing=100), fit_view=True, hide_watermark=True)
+
+        st.write(st.session_state.qep_results)  # TODO: remove after testing
 
 
 # Page navigation

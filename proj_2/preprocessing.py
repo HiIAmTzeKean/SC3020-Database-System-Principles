@@ -1,5 +1,6 @@
 import psycopg2
 from psycopg2 import sql
+import json
 
 
 class Database:
@@ -61,7 +62,7 @@ class Database:
                 sql.SQL("EXPLAIN (ANALYZE, FORMAT JSON) {}").format(sql.SQL(query))
             )
             qep_result = self.cursor.fetchone()[0]
-            return qep_result
+            return json.dumps(qep_result)
         except Exception as e:
             print("Error retrieving QEP:", e)
             return None

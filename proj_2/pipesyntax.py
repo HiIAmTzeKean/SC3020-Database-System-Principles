@@ -1,9 +1,8 @@
 import json
 
-import matplotlib.pyplot as plt
-import networkx as nx
 from preprocessing import Database
 from project import logger
+from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
 
 
 class QueryPlanNode:
@@ -33,8 +32,6 @@ class QueryExecutionPlanGraph:
         self.qep = qep
         self.root: QueryPlanNode
 
-        self.execution_graph = nx.DiGraph()
-
     def _qep_to_json(self) -> dict:
         return json.loads(self.qep)[0]["Plan"]
 
@@ -57,39 +54,64 @@ class QueryExecutionPlanGraph:
         """
         self._parse()
 
-    def generate_nx_graph(self) -> None:
+    def visualize(self) -> tuple[list["StreamlitFlowNode"], list["StreamlitFlowEdge"]]:
         """
-        Generate a NetworkX graph from query
+        Generate Streamlit Flow nodes & edges to be visualized on the interface.
+        """
+        nodes = []
+        edges = []
+        # mutable counter to maintain state during recursion
+        node_counter = [1]
 
-        Args:
-            query (str): query string.
-        """
-        return self._generate_from_pipe_syntax(self.query)
+        def _build_flow_nodes_and_edges(node: QueryPlanNode, parent_id: str = None) -> str:
+            node_id = str(node_counter[0])
+            node_counter[0] += 1
 
-    def _generate_from_pipe_syntax(self, pipe_syntax: str) -> None:
-        """
-        Generate a NetworkX graph for the execution plan based on the pipe syntax.
+            label = f"<h5>{node.node_type}</h5>"
+            # TODO finalize fields that we want to keep
+            # YJ: ill figure out a better way to do this & refactor
+            if node.data.get("Relation Name"):
+                label += f"on {node.data.get("Relation Name")}"
+                if node.data.get("Alias") and node.data.get("Relation Name") != node.data.get("Alias"):
+                    label += f" {node.data.get("Alias")}"
+                label += "<br>"
+            if node.data.get("Join Type"):
+                label += f"{node.data.get("Join Type")} join<br>"
+            if node.data.get("Hash Cond"):
+                label += f"on {node.data.get("Hash Cond")}<br>"
 
-        Args:
-            pipe_syntax (str): The pipe syntax string.
-        """
-        # Parse the pipe syntax into steps
-        steps = [step.strip() for step in pipe_syntax.split("|>")]
+            if node.data.get("Total Cost"):
+                label += f"💲 <b>Cost:</b> {node.data.get("Total Cost")}<br>"
+            if node.data.get("Actual Total Time"):
+                label += f"⌛ <b>Time:</b> {node.data.get("Actual Total Time")}<br>"
 
-        # Add nodes and edges to the graph
-        for i, step in enumerate(steps):
-            self.execution_graph.add_node(i, label=step)
-            if i > 0:
-                self.execution_graph.add_edge(i - 1, i)
+            label += "<details><summary>Details</summary><sup>more details here if we want</sup></details>"  # TODO details
 
-    def visualize(self) -> None:
-        """
-        Visualize the execution plan graph using matplotlib.
-        """
-        pos = nx.drawing.nx_agraph.graphviz_layout(self.execution_graph, prog="dot", args="-Grankdir=BT")
-        labels = nx.get_node_attributes(self.execution_graph, "label")
-        nx.draw(self.execution_graph, pos, with_labels=True, labels=labels, node_size=3000, node_color="lightblue")
-        plt.show()
+            flow_node = StreamlitFlowNode(
+                id=node_id,
+                # Position will be handled by frontend layout engine if (0,0)
+                pos=(0, 0),
+                data={"content": label},
+                node_type='input' if not parent_id else (
+                    'default' if node.children else 'output'),
+                source_position='right',
+                target_position='left',
+                width=200,
+                style={'width': '200px'}
+            )
+            nodes.append(flow_node)
+
+            if parent_id:
+                edge_id = f"{parent_id}-{node_id}"
+                edge = StreamlitFlowEdge(
+                    id=edge_id, source=parent_id, target=node_id)
+                edges.append(edge)
+
+            for child in node.children:
+                _build_flow_nodes_and_edges(child, node_id)
+
+        _build_flow_nodes_and_edges(self.root)
+        return nodes, edges
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.query})"

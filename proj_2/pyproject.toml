@@ -5,12 +5,10 @@ description = "SC3020 Database System project 2"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "matplotlib>=3.10.1",
-    "networkx>=3.4.2",
     "psycopg2>=2.9.10",
     "psycopg2-binary>=2.9.10",
-    "pygraphviz>=1.14",
     "streamlit>=1.43.2",
+    "streamlit-flow-component>=1.6.1",
 ]
 
 [tool.setuptools.packages.find]
