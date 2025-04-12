@@ -65,7 +65,7 @@ class Database:
             return json.dumps(qep_result)
         except Exception as e:
             print("Error retrieving QEP:", e)
-            return None
+            raise e
 
     def close_connection(self) -> None:
         """Closes the database connection."""

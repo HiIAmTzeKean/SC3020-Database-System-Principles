@@ -178,6 +178,7 @@ def main():
         st.rerun()
 
     col1, col2 = st.columns(2, gap="large")
+    error_msg = None
     with col1:
         # TODO (nice-to-have): query validation, syntax highlighting
         sql_query = st.text_area(
@@ -214,14 +215,16 @@ def main():
                                 nodes, edges
                             )
                     except Exception as e:
-                        # TODO proper error handling
-                        st.error(e)
+                        error_msg = e
         with col1_2:
             with st.expander(label="Select an Example Query", expanded=False):
                 for query_name, query in example_queries.items():
                     if st.button(query_name):
                         st.session_state.selected_example_query = query
                         st.rerun()
+
+        if error_msg:
+            st.error(error_msg)
 
     with col2:
         pipe_syntax_result = st.text_area(
