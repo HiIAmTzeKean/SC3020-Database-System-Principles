@@ -1,4 +1,6 @@
 import json
+from collections import namedtuple
+from typing import Optional
 
 from preprocessing import Database
 from project import logger
@@ -7,12 +9,19 @@ from streamlit_flow.elements import StreamlitFlowEdge, StreamlitFlowNode
 
 class QueryPlanNode:
     def __init__(self, node_data: dict[str, str | float | list[str]]) -> None:
-        self.node_type = node_data.get("Node Type")
+        self.node_type: str = node_data.get("Node Type")
         self.startup_cost = node_data.get("Startup Cost")
         self.total_cost = node_data.get("Total Cost")
-        self.relation_name = node_data.get("Relation Name")
-        self.sort_key = node_data.get("Sort Key")
-        self.parent_relation = node_data.get("Parent Relationship")
+        self.relation_name: str = node_data.get("Relation Name")
+        self.sort_key: list[str] = node_data.get("Sort Key")
+        self.parent_relation: str = node_data.get("Parent Relationship")
+        self.index_condition: list[str] = [] if node_data.get(
+            "Index Cond") is None else [node_data.get("Index Cond")]
+        self.hash_condition: list[str] = [] if node_data.get("Hash Cond") is None else [
+                                                             node_data.get("Hash Cond")]
+        self.join_type: str = node_data.get("Join Type")
+        self.left_table: str = None
+        self.right_table: str = None
 
         self.children = []
         self.data = node_data  # Store the entire node data for potential future use
@@ -177,6 +186,10 @@ class QueryExecutionPlanGraph:
         return f"{self.__class__.__name__}({self.query})"
 
 
+RelationInfo = namedtuple(
+    "RelationInfo", ["node_type", "relation_name", "index_condition"])
+
+
 class PipeSyntax:
     """PipeSyntax class to represent a SQL query in pipe syntax.
 
@@ -198,12 +211,33 @@ class PipeSyntax:
             self.pipesyntax = self._convert_to_pipe_syntax()
         return self.pipesyntax
 
-    def _traverse_bottom_up(self, node: QueryPlanNode, result_list: list) -> None:
+    def _handle_child_return(self, child_return: Optional[RelationInfo], node: QueryPlanNode) -> None:
+        if child_return is None:
+            return
+        if child_return.node_type == "scan" and "join" in node.node_type.lower():
+            if node.left_table is None:
+                node.left_table = child_return.relation_name
+            elif node.right_table is None:
+                node.right_table = child_return.relation_name
+            else:
+                raise ValueError("More than two children for a join node.")
+            node.index_condition.extend(child_return.index_condition)
+        elif child_return.node_type == "scan":
+            node.relation_name = child_return.relation_name if node.relation_name is None else node.relation_name
+            node.index_condition.extend(child_return.index_condition)
+
+    def _traverse_bottom_up(self, node: QueryPlanNode, result_list: list) -> RelationInfo | None:
         """
         Traverses the query plan graph in a bottom-up manner.
         """
         for child in node.children:
-            self._traverse_bottom_up(child, result_list)
+            child_return = self._traverse_bottom_up(child, result_list)
+            self._handle_child_return(child_return, node)
+
+        if "scan" in node.node_type.lower() or node.node_type.lower() == "hash":
+            # push relation and index condition to up
+            return RelationInfo("scan", node.relation_name, node.index_condition)
+
         result_list.append(node)
 
     def _generate_bottom_up_output(self, root_node: QueryPlanNode) -> list[QueryPlanNode]:
@@ -232,8 +266,15 @@ class PipeSyntax:
                 ret += f"{node_type} on {
                     node.relation_name} (Cost: {node.total_cost})\n"
             elif "join" in node_type.lower():
+
+
+<< << << < HEAD
                 ret += f"{node.parent_relation} JOIN {
                     node.relation_name} (Cost: {node.total_cost})\n"
+== == == =
+                ret += f"{node.join_type.upper()} JOIN {node.left_table} WITH {node.right_table} ON {
+                                               node.hash_condition, node.index_condition} (Cost: {node.total_cost})\n"
+>>>>>> > 7debdcd(Add relatively stable parsing)
             else:
                 ret += f"{node_type} (Cost: {node.total_cost})\n"
             ret += "|> "
