@@ -2,16 +2,17 @@ import json
 
 from preprocessing import Database
 from project import logger
-from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
+from streamlit_flow.elements import StreamlitFlowEdge, StreamlitFlowNode
 
 
 class QueryPlanNode:
-    def __init__(self, node_data: dict) -> None:
+    def __init__(self, node_data: dict[str, str | float | list[str]]) -> None:
         self.node_type = node_data.get("Node Type")
         self.startup_cost = node_data.get("Startup Cost")
         self.total_cost = node_data.get("Total Cost")
         self.relation_name = node_data.get("Relation Name")
         self.sort_key = node_data.get("Sort Key")
+        self.parent_relation = node_data.get("Parent Relationship")
 
         self.children = []
         self.data = node_data  # Store the entire node data for potential future use
@@ -126,6 +127,25 @@ class QueryExecutionPlanGraph:
                 f"<details><summary>Details</summary><sup><strong>{node.node_type}</strong> {explanation_map.get(node.node_type, "")}</sup></details>")
 
             label = "".join(label_lines)
+            if node.data.get("Relation Name"):
+                label += f"on {node.data.get('Relation Name')}"
+                if node.data.get("Alias") and node.data.get("Relation Name") != node.data.get("Alias"):
+                    label += f" {node.data.get('Alias')}"
+                label += "<br>"
+            if node.data.get("Join Type"):
+                label += f"{node.data.get('Join Type')} join<br>"
+            if node.data.get("Hash Cond"):
+                label += f"on {node.data.get('Hash Cond')}<br>"
+
+            if node.data.get("Total Cost"):
+                label += f"💲 <b>Cost:</b> {node.data.get('Total Cost')}<br>"
+            if node.data.get("Actual Total Time"):
+                label += f"⌛ <b>Time:</b> {
+                    node.data.get('Actual Total Time')}<br>"
+
+            label += (
+                "<details><summary>Details</summary><sup>more details here if we want</sup></details>"  # TODO details
+            )
 
             flow_node = StreamlitFlowNode(
                 id=node_id,
@@ -184,9 +204,9 @@ class PipeSyntax:
         """
         for child in node.children:
             self._traverse_bottom_up(child, result_list)
-        result_list.append(node.data)
+        result_list.append(node)
 
-    def _generate_bottom_up_output(self, root_node: QueryPlanNode) -> list:
+    def _generate_bottom_up_output(self, root_node: QueryPlanNode) -> list[QueryPlanNode]:
         """
         Generates a bottom-up output from the query plan graph.
         """
@@ -201,13 +221,21 @@ class PipeSyntax:
         parse_list = self._generate_bottom_up_output(self.qep.root)
         ret = ""
         for node in parse_list:
-            node_type = node.get("Node Type")
+            node_type = node.node_type
+            assert type(node_type) is str
             if node_type == "Sort":
-                ret += f"{node_type} sort on {node.get('Sort Key')} (Cost: {node.get('Total Cost')})\n"
-            elif node_type == "Seq Scan" or node_type == "Bitmap Heap Scan":
-                ret += f"{node_type} on {node.get('Relation Name')} (Cost: {node.get('Total Cost')})\n"
+                order_list = node.sort_key
+                assert type(order_list) is list
+                ret += f"ORDER BY {','.join(order_list)
+                                   } (Cost: {node.total_cost})\n"
+            elif "scan" in node_type.lower():
+                ret += f"{node_type} on {
+                    node.relation_name} (Cost: {node.total_cost})\n"
+            elif "join" in node_type.lower():
+                ret += f"{node.parent_relation} JOIN {
+                    node.relation_name} (Cost: {node.total_cost})\n"
             else:
-                ret += f"{node_type} (Cost: {node.get('Total Cost')})\n"
+                ret += f"{node_type} (Cost: {node.total_cost})\n"
             ret += "|> "
         ret = ret[:-4]
         ret += ";"
