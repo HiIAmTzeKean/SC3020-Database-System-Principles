@@ -2,58 +2,52 @@ import psycopg2
 from psycopg2 import sql
 import json
 
-
 class Database:
-    config = {
-        "dbname": "imdb",
-        "user": "group1",
-        "password": "group1",
-        "host": "localhost",
-        "port": 5432,
-    }
-
-    def __init__(self) -> None:
+    def __init__(self, config) -> None:
         """Initializes the database connection."""
+        self.config = config  
         try:
             self.conn = psycopg2.connect(**self.config)
             self.conn.autocommit = True
             self.cursor = self.conn.cursor()
             print("Connected to database successfully.")
         except Exception as e:
-            # database likely not created yet
+            # Database likely not created yet
             self.setup()
 
-    def setup(self) -> None:
-        """Ensures the database and user exist before proceeding."""
+    def get_db_schema(self) -> dict:
+        """Returns a nested dictionary of public tables with their columns and data types."""
         try:
-            admin_conn = psycopg2.connect(
-                dbname="postgres",
-                user="postgres",
-                password="postgres",
-                host="localhost",
-                port=5432,
-            )
-            admin_conn.autocommit = True
-            admin_cursor = admin_conn.cursor()
+            # Query to fetch all tables in the 'public' schema
+            self.cursor.execute("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name;
+            """)
+            tables = [row[0] for row in self.cursor.fetchall()]
 
-            admin_cursor.execute(
-                "SELECT 1 FROM pg_roles WHERE rolname=%s;", ("group1",)
-            )
-            if admin_cursor.fetchone() is None:
-                admin_cursor.execute("CREATE USER group1 WITH LOGIN PASSWORD 'group1';")
-                print("User 'group1' created successfully.")
+            # Create a nested dictionary for ALLOWED_COLUMNS dynamically
+            schema_dict = {}
+            for table in tables:
+                self.cursor.execute(f"""
+                    SELECT column_name, data_type
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    AND table_name = %s
+                    ORDER BY ordinal_position;
+                """, (table,))
 
-            admin_cursor.execute(
-                "SELECT 1 FROM pg_database WHERE datname=%s;", ("imdb",)
-            )
-            if admin_cursor.fetchone() is None:
-                admin_cursor.execute("CREATE DATABASE imdb WITH OWNER group1;")
-                print("Database 'imdb' created successfully.")
+                # Dict {column_name: data_type}
+                columns = {row[0]: row[1] for row in self.cursor.fetchall()}
+                # {table_name: {column_name: data_type}}
+                schema_dict[table] = columns
 
-            admin_cursor.close()
-            admin_conn.close()
+            return schema_dict
         except Exception as e:
-            print("Error setting up PostgreSQL:", e)
+            print("Error retrieving tables and columns:", e)
+            raise e
 
     def get_qep(self, query: str) -> str | None:
         """Retrieves the Query Execution Plan (QEP) for a given SQL query."""
@@ -75,8 +69,24 @@ class Database:
             self.conn.close()
             print("Database connection closed.")
 
-
 if __name__ == "__main__":
-    db = Database()
-    db.get_qep("SELECT * FROM title_basics LIMIT 10;")
+    # Idk the database name, will update again after checking with SH
+    config = {
+        "dbname": input("Enter database name: "),
+        "user": input("Enter username: "),
+        "password": input("Enter password: "),
+        "host": input("Enter host: ") or "10.140.58.158",
+        "port": int(input("Enter port: ") or 5432),
+    }
+
+    db = Database(config)
+
+    # Ask for SQL query
+    # Example query = "SELECT * FROM name_basics LIMIT 10;"
+    query = input("Enter your SQL query: ")
+
+    qep_json = db.get_qep(query)
+    if qep_json:
+        print("QEP Result:\n", qep_json)
+
     db.close_connection()
