@@ -2,10 +2,11 @@ import psycopg2
 from psycopg2 import sql
 import json
 
+
 class Database:
     def __init__(self, config) -> None:
         """Initializes the database connection."""
-        self.config = config  
+        self.config = config
         try:
             self.conn = psycopg2.connect(**self.config)
             self.conn.autocommit = True
@@ -19,25 +20,30 @@ class Database:
         """Returns a nested dictionary of public tables with their columns and data types."""
         try:
             # Query to fetch all tables in the 'public' schema
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
                 AND table_type = 'BASE TABLE'
                 ORDER BY table_name;
-            """)
+            """
+            )
             tables = [row[0] for row in self.cursor.fetchall()]
 
             # Create a nested dictionary for ALLOWED_COLUMNS dynamically
             schema_dict = {}
             for table in tables:
-                self.cursor.execute(f"""
+                self.cursor.execute(
+                    f"""
                     SELECT column_name, data_type
                     FROM information_schema.columns
                     WHERE table_schema = 'public'
                     AND table_name = %s
                     ORDER BY ordinal_position;
-                """, (table,))
+                """,
+                    (table,),
+                )
 
                 # Dict {column_name: data_type}
                 columns = {row[0]: row[1] for row in self.cursor.fetchall()}
@@ -69,13 +75,13 @@ class Database:
             self.conn.close()
             print("Database connection closed.")
 
+
 if __name__ == "__main__":
-    # Idk the database name, will update again after checking with SH
     config = {
-        "dbname": input("Enter database name: "),
-        "user": input("Enter username: "),
-        "password": input("Enter password: "),
-        "host": input("Enter host: ") or "10.140.58.158",
+        "dbname": input("Enter database name: ") or "imdb",
+        "user": input("Enter username: ") or "group1",
+        "password": input("Enter password: ") or "group1",
+        "host": input("Enter host: ") or "18.140.58.158",
         "port": int(input("Enter port: ") or 5432),
     }
 
@@ -87,6 +93,6 @@ if __name__ == "__main__":
 
     qep_json = db.get_qep(query)
     if qep_json:
-        print("QEP Result:\n", qep_json)
+        print("QEP Result:\n", json.dumps(json.loads(qep_json), indent=2))
 
     db.close_connection()
