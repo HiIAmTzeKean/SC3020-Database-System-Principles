@@ -29,9 +29,15 @@ for key, value in default_session_states.items():
 
 # TODO: setup examples
 example_queries = {
-    "1 - Get first 10 rows from title_basics table":
+    "1 - Get the top 10 highest-rated movies with more than 100,000 votes":
     """
-    SELECT * FROM title_basics LIMIT 10;
+    SELECT tb.primarytitle, tr.averagerating, tr.numvotes
+    FROM title_basics tb
+    JOIN title_ratings tr ON tb.tconst = tr.tconst
+    WHERE tb.titletype = 'movie'
+    AND tr.numvotes > 100000
+    ORDER BY tr.averagerating DESC
+    LIMIT 10;
     """,
     "2 - Get original titles released in non-English languages":
     """
@@ -40,9 +46,14 @@ example_queries = {
     JOIN title_akas ta ON tb.tconst = ta.titleid
     WHERE ta.language != 'en' AND ta.isoriginaltitle = TRUE;
     """,
-    "3 - Find ZZZ":
+    "3 - Get all actors in a specified movie":
     """
-    SELECT * FROM zzz;
+    SELECT nb.primaryname, tp.category, tp.job, tp.characters
+    FROM title_basics tb
+    JOIN title_principals tp ON tb.tconst = tp.tconst
+    JOIN name_basics nb ON tp.nconst = nb.nconst
+    WHERE tb.primarytitle = 'Inception'
+    AND tp.category = 'actor';
     """
 }
 
@@ -219,7 +230,7 @@ def main():
             hide_watermark=True,
         )
 
-        st.write(st.session_state.qep_results)  # TODO: remove after testing
+        # st.write(st.session_state.qep_results)  # QEP output, for testing only
 
 
 # Page navigation

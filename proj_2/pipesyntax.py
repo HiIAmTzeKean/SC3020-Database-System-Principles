@@ -20,7 +20,8 @@ class QueryPlanNode:
         self.children.append(child_node)
 
     def __str__(self, level: int = 0) -> str:
-        ret = "|>" * level + repr(self.node_type) + " (Cost: " + str(self.total_cost) + ")\n"
+        ret = "|>" * level + repr(self.node_type) + \
+            " (Cost: " + str(self.total_cost) + ")\n"
         for child in self.children:
             ret += child.__str__(level + 1)
         return ret
@@ -67,25 +68,64 @@ class QueryExecutionPlanGraph:
             node_id = str(node_counter[0])
             node_counter[0] += 1
 
-            label = f"<h5>{node.node_type}</h5>"
-            # TODO finalize fields that we want to keep
-            # YJ: ill figure out a better way to do this & refactor
-            if node.data.get("Relation Name"):
-                label += f"on {node.data.get('Relation Name')}"
-                if node.data.get("Alias") and node.data.get("Relation Name") != node.data.get("Alias"):
-                    label += f" {node.data.get('Alias')}"
-                label += "<br>"
-            if node.data.get("Join Type"):
-                label += f"{node.data.get('Join Type')} join<br>"
-            if node.data.get("Hash Cond"):
-                label += f"on {node.data.get('Hash Cond')}<br>"
+            # get node details
+            label_lines = [f"<h5>{node.node_type}</h5>"]
 
-            if node.data.get("Total Cost"):
-                label += f"💲 <b>Cost:</b> {node.data.get('Total Cost')}<br>"
-            if node.data.get("Actual Total Time"):
-                label += f"⌛ <b>Time:</b> {node.data.get('Actual Total Time')}<br>"
+            relation = node.data.get("Relation Name")
+            alias = node.data.get("Alias")
+            if relation:
+                line = f"on {relation}"
+                if alias and alias != relation:
+                    line += f" {alias}"
+                label_lines.append(line + "<br>")
 
-            label += "<details><summary>Details</summary><sup>more details here if we want</sup></details>"  # TODO details
+            fields = [
+                ("Group Key", "by {}<br>"),
+                ("Sort Key", "by {}<br>"),
+                ("Join Type", "{} join<br>"),
+                ("Index Name", "using {}<br>"),
+                ("Hash Cond", "on {}<br>"),
+                ("CTE Name", "CTE {}<br>"),
+                ("Filter", "where {}<br>"),
+                ("Total Cost", "💲 <b>Cost:</b> {}<br>"),
+                ("Actual Total Time", "⌛ <b>Time:</b> {}<br>"),
+            ]
+
+            for key, template in fields:
+                value = node.data.get(key)
+                if value:
+                    label_lines.append(template.format(value))
+
+            # explanation for node type. all node types can be found in `explain.c` of postgres source code
+            explanation_map = {
+                "Append": "concatenates the results of multiple subplans. It is typically used to combine results from multiple partitions or UNION ALL queries.",
+                "Merge Append": "merges sorted results from multiple subplans into a single sorted output. Useful for ordered queries over partitioned tables.",
+                "Nested Loop": "merges two record sets by looping through every record in the first set and trying to find a match in the second set. All matching records are returned.",
+                "Merge Join": "merges two record sets by first sorting them on a join key.",
+                "Hash Join": "joins two record sets by hashing one of them (using a Hash Scan).",
+                "Seq Scan": "finds relevant records by sequentially scanning the input record set. When reading from a table, Seq Scan performs a single read operation (only the table is read).",
+                "Gather": "reads the results of the parallel workers, in an undefined order.",
+                "Gather Merge": "reads the results of the parallel workers, preserving any ordering.",
+                "Index Scan": "finds relevant records based on an index. Index Scans perform 2 read operations: one to read the index and another to read the actual value from the table.",
+                "Index Only Scan": "finds relevant records based on an index. Index Only Scan performs a single read operation from the index and does not read from the corresponding table.",
+                "Bitmap Index Scan": "uses a Bitmap Index (index which uses 1 bit per page) to find all relevant pages. Results of this node are fed to the Bitmap Heap Scan.",
+                "Bitmap Heap Scan": "searches through the pages returned by the Bitmap Index Scan for relevant rows.",
+                "Subquery Scan": "executes a subquery and returns the results as a record set. It wraps a subquery used in the FROM clause.",
+                "Values Scan": "scans a VALUES clause (i.e., an inline table of literal rows) and returns each row.",
+                "CTE Scan": "performs a sequential scan of Common Table Expression (CTE) query results. Note that results of a CTE are materialized (calculated and temporarily stored).",
+                "Materialize": "stores the result of its input subplan in memory (or disk if needed) so that it can be scanned multiple times. Often used to break pipelines or avoid recomputation.",
+                "Memoize": "is used to cache the results of the inner side of a nested loop. It avoids executing underlying nodes when the results for the current parameters are already in the cache.",
+                "Sort": "sorts a record set based on the specified sort key.",
+                "Aggregate": "groups records together based on a GROUP BY or aggregate function.",
+                "Unique": "removes duplicate rows from the input record set. Often used to implement DISTINCT.",
+                "SetOp": "performs set operations such as INTERSECT, INTERSECT ALL, EXCEPT, or EXCEPT ALL on multiple input sets.",
+                "Limit": "returns a specified number of rows from a record set.",
+                "Hash": "generates a hash table from the records in the input recordset. Hash is used by Hash Join.",
+            }
+            label_lines.append(
+                f"<details><summary>Details</summary><sup><strong>{node.node_type}</strong> {explanation_map.get(node.node_type, "")}</sup></details>")
+
+            label = "".join(label_lines)
 
             flow_node = StreamlitFlowNode(
                 id=node_id,
@@ -96,8 +136,8 @@ class QueryExecutionPlanGraph:
                     'default' if node.children else 'output'),
                 source_position='right',
                 target_position='left',
-                width=200,
-                style={'width': '200px'}
+                width=300,
+                style={'width': '300px'}
             )
             nodes.append(flow_node)
 
@@ -193,10 +233,7 @@ class PipeSyntaxParser:
         logger.info("PipeSyntaxParser initialized with database.")
 
     def _get_qep(self, query: str) -> str:
-        # qep = self.database.get_qep(query)
-        # TODO change this when database works
-        with open("sql_qep.txt", "r") as file:
-            qep = file.read()
+        qep = self.database.get_qep(query)
         return qep
 
     def _compute_query(self, query: str) -> None:
