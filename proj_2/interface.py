@@ -61,7 +61,17 @@ example_queries = {
 
 
 def login():
-    st.title("QEP Visualizer")
+    st.title(
+        "QEP Visualizer [SC3020 Group 1]")
+    st.subheader("❓ Can Query Execution Plans Help You Generate Better SQL?")
+    st.markdown("""
+    This project aims to enhance SQL query comprehension by transforming input SQL queries into an equivalent, easier-to-read pipe-syntax format using query execution plans (QEP).
+            
+    ##### ✨ Features:
+    1. **Generate Pipe-Syntax Format**: Convert SQL queries into its pipe-syntax format, annotated with estimated execution costs.  
+    2. **Visualize QEP**: Display an interactive visualization of the QEP for the SQL queries.
+    3. **Query Interface**: Provide a user-friendly interface to write and execute SQL queries with syntax highlighting, error validation, and display of query results in a dataframe. The database schema can also be viewed.
+    """)
     st.subheader("Database Login")
 
     db_location_options = ("Cloud", "Local")
@@ -161,6 +171,7 @@ def main():
             theme="sqlserver",
             auto_update=True,
             key=f"editor_{st.session_state.editor_rerun_key}",
+            placeholder="Enter SQL query ..."
         )
 
         col1_1, col1_2 = st.columns([2, 4], gap="small")
