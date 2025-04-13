@@ -5,6 +5,7 @@ from streamlit_flow import streamlit_flow
 from streamlit_flow.state import StreamlitFlowState
 from streamlit_flow.layouts import LayeredLayout
 import json
+from streamlit_ace import st_ace
 
 
 st.set_page_config(page_title="QEP Visualizer", layout="wide")
@@ -20,6 +21,7 @@ default_session_states = {
     "qep_results": "",
     "pipe_syntax_parser": None,
     "streamlit_flow_state": None,
+    "editor_rerun_key": 0
 }
 for key, value in default_session_states.items():
     if key not in st.session_state:
@@ -27,16 +29,21 @@ for key, value in default_session_states.items():
 
 # TODO: setup examples
 example_queries = {
-    "1 - Get first 10 rows from title_basics table": """
-        SELECT * FROM title_basics LIMIT 10;
+    "1 - Get first 10 rows from title_basics table":
+    """
+    SELECT * FROM title_basics LIMIT 10;
     """,
-    "2 - Get original titles released in non-English languages": """
-        SELECT tb.primarytitle, ta.language
-        FROM title_basics tb
-        JOIN title_akas ta ON tb.tconst = ta.titleid
-        WHERE ta.language != 'en' AND ta.isoriginaltitle = TRUE;
+    "2 - Get original titles released in non-English languages":
+    """
+    SELECT tb.primarytitle, ta.language
+    FROM title_basics tb
+    JOIN title_akas ta ON tb.tconst = ta.titleid
+    WHERE ta.language != 'en' AND ta.isoriginaltitle = TRUE;
     """,
-    # "3 - Find ZZZ": "SELECT * FROM zzz;",
+    "3 - Find ZZZ":
+    """
+    SELECT * FROM zzz;
+    """
 }
 
 
@@ -132,11 +139,15 @@ def main():
     col1, col2 = st.columns(2, gap="large")
     error_msg = None
     with col1:
-        # TODO (nice-to-have): query validation, syntax highlighting
-        sql_query = st.text_area(
-            label="SQL Query",
+        st.markdown("**SQL Query**")
+        sql_query = st_ace(
             value=st.session_state.selected_example_query.strip(),
+            language="sql",
             height=200,
+            font_size=18,
+            theme="sqlserver",
+            auto_update=True,
+            key=f"editor_{st.session_state.editor_rerun_key}",
         )
 
         col1_1, col1_2 = st.columns([1, 3], gap="medium")
@@ -178,17 +189,22 @@ def main():
                 for query_name, query in example_queries.items():
                     if st.button(query_name):
                         st.session_state.selected_example_query = query
+                        st.session_state.editor_rerun_key += 1  # force code editor to rerun
                         st.rerun()
 
         if error_msg:
             st.error(f"Failed to run query. Error: {error_msg}")
 
     with col2:
-        pipe_syntax_result = st.text_area(
-            label="Pipe Syntax Result",
+        st.markdown("**Pipe Syntax Result**")
+        pipe_syntax_result = st_ace(
             value=st.session_state.pipe_syntax_result,
-            disabled=True,
+            language="c_cpp",  # just for syntax highlighting style
             height=200,
+            font_size=18,
+            theme="terminal",
+            readonly=True,
+            show_gutter=False,
         )
 
     st.subheader("QEP Visualizer")
