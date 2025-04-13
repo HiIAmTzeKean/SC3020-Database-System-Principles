@@ -39,12 +39,13 @@ example_queries = {
     ORDER BY tr.averagerating DESC
     LIMIT 10;
     """,
-    "2 - Get original titles released in non-English languages":
+    "2 - Get number of titles per year from 2020-2022":
     """
-    SELECT tb.primarytitle, ta.language
-    FROM title_basics tb
-    JOIN title_akas ta ON tb.tconst = ta.titleid
-    WHERE ta.language != 'en' AND ta.isoriginaltitle = TRUE;
+    SELECT startyear, COUNT(*) AS num_titles
+    FROM title_basics
+    WHERE startyear BETWEEN 2020 AND 2022
+    GROUP BY startyear
+    ORDER BY startyear DESC;
     """,
     "3 - Get all actors in a specified movie":
     """
