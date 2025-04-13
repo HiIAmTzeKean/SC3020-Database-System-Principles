@@ -71,19 +71,19 @@ class QueryExecutionPlanGraph:
             # TODO finalize fields that we want to keep
             # YJ: ill figure out a better way to do this & refactor
             if node.data.get("Relation Name"):
-                label += f"on {node.data.get("Relation Name")}"
+                label += f"on {node.data.get('Relation Name')}"
                 if node.data.get("Alias") and node.data.get("Relation Name") != node.data.get("Alias"):
-                    label += f" {node.data.get("Alias")}"
+                    label += f" {node.data.get('Alias')}"
                 label += "<br>"
             if node.data.get("Join Type"):
-                label += f"{node.data.get("Join Type")} join<br>"
+                label += f"{node.data.get('Join Type')} join<br>"
             if node.data.get("Hash Cond"):
-                label += f"on {node.data.get("Hash Cond")}<br>"
+                label += f"on {node.data.get('Hash Cond')}<br>"
 
             if node.data.get("Total Cost"):
-                label += f"💲 <b>Cost:</b> {node.data.get("Total Cost")}<br>"
+                label += f"💲 <b>Cost:</b> {node.data.get('Total Cost')}<br>"
             if node.data.get("Actual Total Time"):
-                label += f"⌛ <b>Time:</b> {node.data.get("Actual Total Time")}<br>"
+                label += f"⌛ <b>Time:</b> {node.data.get('Actual Total Time')}<br>"
 
             label += "<details><summary>Details</summary><sup>more details here if we want</sup></details>"  # TODO details
 
