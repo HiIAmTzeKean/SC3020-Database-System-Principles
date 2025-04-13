@@ -2,7 +2,6 @@ import streamlit as st
 from preprocessing import Database
 from pipesyntax import PipeSyntaxParser
 from streamlit_flow import streamlit_flow
-from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
 from streamlit_flow.state import StreamlitFlowState
 from streamlit_flow.layouts import LayeredLayout
 import json
@@ -37,7 +36,7 @@ example_queries = {
         JOIN title_akas ta ON tb.tconst = ta.titleid
         WHERE ta.language != 'en' AND ta.isoriginaltitle = TRUE;
     """,
-    "3 - Find ZZZ": "SELECT * FROM zzz;",
+    # "3 - Find ZZZ": "SELECT * FROM zzz;",
 }
 
 
@@ -94,7 +93,7 @@ def login():
                 st.error(f"One or more fields are empty.")
             else:
                 try:
-                    db = Database()
+                    db = Database(db_params)
                     st.session_state.db_connection = db  # TODO: connect using db_params
                     st.session_state.pipe_syntax_parser = PipeSyntaxParser(db)
 
