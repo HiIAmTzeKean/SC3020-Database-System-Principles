@@ -14,7 +14,7 @@ default_session_states = {
     "page": "login",
     "db_connection": None,
     "db_location": "Cloud",
-    "db_schema": "IMDB",
+    "db_name": "",
     "selected_example_query": "",
     "pipe_syntax_result": "",
     "qep_results": "",
@@ -53,30 +53,37 @@ def login():
 
     with st.form("db_login_form"):
         if st.session_state.db_location == "Cloud":
-            # TODO: set up cloud db & store credentials in secrets
             db_params = {
                 "dbname": "imdb",
                 "user": "group1",
                 "password": "group1",
-                "host": "localhost",
+                "host": "18.140.58.158",
                 "port": "5432",
                 "sslmode": "require",
             }
         elif st.session_state.db_location == "Local":
             st.markdown("**Local Database Credentials**")
             dbname = st.text_input(
-                label="Database Name", placeholder="Enter database name"
+                label="Database Name",
+                placeholder="Enter database name (e.g. imdb)",
             )
             username = st.text_input(
-                label="Username", placeholder="Enter your username"
+                label="Username",
+                placeholder="Enter username (e.g. group1)",
             )
             password = st.text_input(
-                label="Password", type="password", placeholder="Enter your password"
+                label="Password",
+                type="password",
+                placeholder="Enter password (e.g. group1)",
             )
             host = st.text_input(
-                label="Host", placeholder="e.g., localhost, or IP address"
+                label="Host",
+                placeholder="Enter host IP address (e.g. localhost)",
             )
-            port = st.text_input(label="Port", placeholder="e.g., 5432")
+            port = st.text_input(
+                label="Port",
+                placeholder="Enter port (e.g. 5432)",
+            )
 
             db_params = {
                 "user": username,
@@ -93,9 +100,11 @@ def login():
                 st.error(f"One or more fields are empty.")
             else:
                 try:
+                    print(db_params)
                     db = Database(db_params)
-                    st.session_state.db_connection = db  # TODO: connect using db_params
+                    st.session_state.db_connection = db
                     st.session_state.pipe_syntax_parser = PipeSyntaxParser(db)
+                    st.session_state.db_name = db_params["dbname"]
 
                     st.session_state.page = "main"
                     st.rerun()
@@ -104,68 +113,11 @@ def login():
 
 
 def main():
-    db_name = ""
-    if st.session_state.db_connection:
-        # TODO: dynamically fetch DB name
-        # db_name = st.session_state.db_connection.get_db_name()
-        db_name = "imdb"
-    st.sidebar.header(f"Current Database: {db_name}")
+    st.sidebar.header(f"Current Database: {st.session_state.db_name}")
 
     st.sidebar.subheader("DB Schema")
     if st.session_state.db_connection:
-        # TODO: dynamically fetch DB schema
-        # db_schema = st.session_state.db_connection.get_db_schema()
-        db_schema = {
-            "name_basics": {
-                "nconst": "text",
-                "primaryname": "text",
-                "birthyear": "integer",
-                "deathyear": "integer",
-                "primaryprofession": "text",
-                "knownfortitles": "text",
-            },
-            "title_akas": {
-                "titleid": "text",
-                "ordering": "integer",
-                "title": "text",
-                "region": "text",
-                "language": "text",
-                "types": "text",
-                "attributes": "text",
-                "isoriginaltitle": "boolean",
-            },
-            "title_basics": {
-                "tconst": "text",
-                "titletype": "text",
-                "primarytitle": "text",
-                "originaltitle": "text",
-                "isadult": "boolean",
-                "startyear": "integer",
-                "endyear": "integer",
-                "runtimeminutes": "integer",
-                "genres": "text",
-            },
-            "title_crew": {"tconst": "text", "directors": "text", "writers": "text"},
-            "title_episode": {
-                "tconst": "text",
-                "parenttconst": "text",
-                "seasonnumber": "integer",
-                "episodenumber": "integer",
-            },
-            "title_principals": {
-                "tconst": "text",
-                "ordering": "integer",
-                "nconst": "text",
-                "category": "text",
-                "job": "text",
-                "characters": "text",
-            },
-            "title_ratings": {
-                "tconst": "text",
-                "averagerating": "double precision",
-                "numvotes": "integer",
-            },
-        }
+        db_schema = st.session_state.db_connection.get_db_schema()
         for table, schema in db_schema.items():
             with st.sidebar.expander(table):
                 for attribute, data_type in schema.items():
@@ -195,8 +147,9 @@ def main():
                 st.session_state.pipe_syntax_result = ""
                 st.session_state.streamlit_flow_state = None
 
-                if st.session_state.db_connection:
-                    # TODO: handle QEP results
+                if sql_query.strip() == "":
+                    error_msg = f"Empty query"
+                elif st.session_state.db_connection:
                     try:
                         st.session_state.qep_results = json.loads(
                             st.session_state.db_connection.get_qep(sql_query)
@@ -215,7 +168,11 @@ def main():
                                 nodes, edges
                             )
                     except Exception as e:
-                        error_msg = e
+                        if sql_query in str(e):
+                            # hide SQL query error highlighting
+                            error_msg = str(str(e).splitlines()[0])
+                        else:
+                            error_msg = str(e)
         with col1_2:
             with st.expander(label="Select an Example Query", expanded=False):
                 for query_name, query in example_queries.items():
@@ -224,7 +181,7 @@ def main():
                         st.rerun()
 
         if error_msg:
-            st.error(error_msg)
+            st.error(f"Failed to run query. Error: {error_msg}")
 
     with col2:
         pipe_syntax_result = st.text_area(

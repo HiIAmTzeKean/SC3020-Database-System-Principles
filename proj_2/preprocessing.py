@@ -13,8 +13,7 @@ class Database:
             self.cursor = self.conn.cursor()
             print("Connected to database successfully.")
         except Exception as e:
-            # Database likely not created yet
-            self.setup()
+            raise e
 
     def get_db_schema(self) -> dict:
         """Returns a nested dictionary of public tables with their columns and data types."""
