@@ -19,9 +19,10 @@ default_session_states = {
     "selected_example_query": "",
     "pipe_syntax_result": "",
     "qep_results": "",
+    "query_results": None,
     "pipe_syntax_parser": None,
     "streamlit_flow_state": None,
-    "editor_rerun_key": 0
+    "editor_rerun_key": 0,
 }
 for key, value in default_session_states.items():
     if key not in st.session_state:
@@ -49,7 +50,7 @@ example_queries = {
     """,
     "3 - Get all actors in a specified movie":
     """
-    SELECT nb.primaryname, tp.category, tp.job, tp.characters
+    SELECT nb.primaryname, tp.category, tp.characters
     FROM title_basics tb
     JOIN title_principals tp ON tb.tconst = tp.tconst
     JOIN name_basics nb ON tp.nconst = nb.nconst
@@ -162,16 +163,17 @@ def main():
             key=f"editor_{st.session_state.editor_rerun_key}",
         )
 
-        col1_1, col1_2 = st.columns([1, 3], gap="medium")
+        col1_1, col1_2 = st.columns([2, 4], gap="small")
         with col1_1:
-            if st.button("Run Query"):
+            if st.button("Get Pipe Syntax & QEP", type="primary"):
                 # Reset
                 st.session_state.qep_results = ""
                 st.session_state.pipe_syntax_result = ""
                 st.session_state.streamlit_flow_state = None
+                st.session_state.query_results = None
 
                 if sql_query.strip() == "":
-                    error_msg = f"Empty query"
+                    error_msg = f"Failed to get QEP. Error:  \nEmpty query"
                 elif st.session_state.db_connection:
                     try:
                         st.session_state.qep_results = json.loads(
@@ -193,9 +195,27 @@ def main():
                     except Exception as e:
                         if sql_query in str(e):
                             # hide SQL query error highlighting
-                            error_msg = str(str(e).splitlines()[0])
+                            error_msg = f"Failed to get QEP. Error:  \n{str(str(e).splitlines()[0])}"
                         else:
-                            error_msg = str(e)
+                            error_msg = f"Failed to get QEP. Error:  \n{str(e)}"
+
+            if st.button("Run Query"):
+                # Reset
+                st.session_state.qep_results = ""
+                st.session_state.pipe_syntax_result = ""
+                st.session_state.streamlit_flow_state = None
+                st.session_state.query_results = None
+
+                if st.session_state.db_connection:
+                    try:
+                        st.session_state.query_results = st.session_state.db_connection.execute_query(
+                            sql_query)
+                    except Exception as e:
+                        if sql_query in str(e):
+                            # hide SQL query error highlighting
+                            error_msg = f"Failed to run query. Error:  \n{str(str(e).splitlines()[0])}"
+                        else:
+                            error_msg = f"Failed to run query. Error:  \n{str(e)}"
         with col1_2:
             with st.expander(label="Select an Example Query", expanded=False):
                 for query_name, query in example_queries.items():
@@ -205,7 +225,7 @@ def main():
                         st.rerun()
 
         if error_msg:
-            st.error(f"Failed to run query. Error: {error_msg}")
+            st.error(error_msg)
 
     with col2:
         st.markdown("**Pipe Syntax Result**")
@@ -219,9 +239,8 @@ def main():
             show_gutter=False,
         )
 
-    st.subheader("QEP Visualizer")
-
     if st.session_state.qep_results:
+        st.subheader("QEP Visualizer")
         # TODO fix bug where nodes are not set correctly to layout (reset to 0,0 pos) when same query is re-run
         streamlit_flow(
             "flow",
@@ -232,6 +251,9 @@ def main():
         )
 
         # st.write(st.session_state.qep_results)  # QEP output, for testing only
+    if st.session_state.query_results is not None:
+        st.subheader("Query Execution Results")
+        st.dataframe(st.session_state.query_results)
 
 
 # Page navigation

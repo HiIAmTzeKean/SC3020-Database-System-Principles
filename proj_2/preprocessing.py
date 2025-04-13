@@ -1,6 +1,7 @@
 import psycopg2
 from psycopg2 import sql
 import json
+import pandas as pd
 
 
 class Database:
@@ -64,6 +65,18 @@ class Database:
             return json.dumps(qep_result)
         except Exception as e:
             print("Error retrieving QEP:", e)
+            raise e
+
+    def execute_query(self, query: str) -> pd.DataFrame:
+        """Executes the SQL query and returns the result as a Pandas dataframe."""
+        try:
+            self.cursor.execute(query)
+            results = self.cursor.fetchall()
+            colnames = [desc[0] for desc in self.cursor.description]
+            df = pd.DataFrame(results, columns=colnames)
+            return df
+        except Exception as e:
+            print("Error executing query:", e)
             raise e
 
     def close_connection(self) -> None:
