@@ -56,6 +56,7 @@ def connect():
         dbname=PG_DB, user=PG_USER, password=PG_PASS, host=PG_HOST, port=PG_PORT
     )
 
+
 def drop_existing_tables():
     with connect() as conn:
         logging.info(f"Clean up existing tables to start on new ingestion...")
@@ -111,6 +112,7 @@ def import_dataset(dataset):
                     sio,
                 )
             conn.commit()
+
 
 # Drop existing tables before running the import
 # Ensure that ingestion starts on a clean state
