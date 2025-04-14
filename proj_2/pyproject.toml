@@ -9,6 +9,7 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "streamlit>=1.43.2",
     "streamlit-flow-component>=1.6.1",
+    "streamlit-ace>=0.1.1",
 ]
 
 [tool.setuptools.packages.find]
