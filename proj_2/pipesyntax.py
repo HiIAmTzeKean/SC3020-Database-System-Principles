@@ -30,10 +30,13 @@ class QueryPlanNode:
 
         node_type = node_data.get("Node Type")
         join_filter = node_data.get("Join Filter")
+        output = node_data.get("Output")
         assert isinstance(node_type, str)
         assert join_filter is None or isinstance(join_filter, str)
+        assert isinstance(output, list)
         self.node_type = node_type
         self.join_filter = join_filter
+        self.output = output
 
         if node_type in ["Sample Scan", "Function Scan", "Tid Scan",
                          "Tid Range Scan", "Foreign Scan", "Custom Scan",
@@ -72,7 +75,7 @@ class QueryPlanNode:
             self.cost_info = CostInfo(
                 startup_cost, total_cost, plan_rows, plan_width)
 
-        self.filters: list[str] = []
+        self.index_or_hash_cond: list[str] = []
         self.order_by = None
 
         hash_cond = node_data.get("Hash Cond")
@@ -82,13 +85,12 @@ class QueryPlanNode:
         sort_key = node_data.get("Sort Key")
         if hash_cond is not None:
             assert isinstance(hash_cond, str)
-            self.filters.append(hash_cond)
+            self.index_or_hash_cond.append(hash_cond)
         if index_cond is not None:
             assert isinstance(index_cond, str)
-            self.filters.append(index_cond)
-        if filter_cond is not None:
-            assert isinstance(filter_cond, str)
-            self.filters.append(filter_cond)
+            self.index_or_hash_cond.append(index_cond)
+        assert filter_cond is None or isinstance(filter_cond, str)
+        self.filters = filter_cond
         assert order_by is None or sort_key is None
         assert sort_key is None or isinstance(sort_key, list)
         if order_by is not None:
@@ -107,6 +109,14 @@ class QueryPlanNode:
             self.group_keys = group_key
         elif group_set is not None:
             self.group_keys = group_set
+
+    def full_filter(self, suppress_hash_and_index=False) -> list[str]:
+        result: list[str] = []
+        if self.filters is not None:
+            result.append(self.filters)
+        if not suppress_hash_and_index and self.index_or_hash_cond:
+            result.extend(self.index_or_hash_cond)
+        return result
 
     def add_child(self, child_node: "QueryPlanNode") -> None:
         self.children.append(child_node)
@@ -315,7 +325,7 @@ class PipeSyntax:
             results = []
             for child in n.children:
                 results.extend(self._convert_node_to_filter(child))
-            assert len(n.filters) == 0
+            assert len(n.full_filter()) == 0
             return results
         if n.node_type == "BitmapOr":
             results = []
@@ -325,18 +335,32 @@ class PipeSyntax:
                     results.append(result[0])
                 else:
                     results.append(f"({" AND ".join(result)})")
-            assert len(n.filters) == 0
+            assert len(n.full_filter()) == 0
             return [f"({" OR ".join(results)})"]
-        if len(n.filters) > 0:
-            return n.filters
+        if len(n.full_filter()) > 0:
+            return n.full_filter()
         logger.error("Unknown node type in filter: %s", n.node_type)
         assert False
 
-    def _convert_node_to_pipe_syntax(self, n: QueryPlanNode) -> list[list[str]]:
+    def _clean_output_list(self, output: list[str]) -> list[str]:
+        partial = "PARTIAL "
+        cleaned = []
+        for x in output:
+            if x[0] == "(" and x[-1] == ")":
+                x = x[1:-1]
+            if x.startswith(partial):
+                x = x[len(partial):]
+            cleaned.append(x)
+        return cleaned
+
+    def _clean_output(self, output: list[str]) -> str:
+        return ", ".join(self._clean_output_list(output))
+
+    def _convert_node_to_pipe_syntax(self, n: QueryPlanNode, suppress_hash_index=False) -> list[list[str]]:
         if n.join_type is not None:
             assert len(n.children) == 2
-            left = self._convert_node_to_pipe_syntax(n.children[0])
-            right = self._convert_node_to_pipe_syntax(n.children[1])
+            left = self._convert_node_to_pipe_syntax(n.children[0], True)
+            right = self._convert_node_to_pipe_syntax(n.children[1], True)
             # Choose the shorter one as the source.
             if len(left) < len(right):
                 left, right = right, left
@@ -346,41 +370,60 @@ class PipeSyntax:
             if len(right) == 1 and right[0][0] == "FROM":
                 # FROM a AS b -> a AS b.
                 right_text = " ".join(right[0][1:])
+            join_filters = n.full_filter()
+            join_filters.extend(n.children[0].index_or_hash_cond)
+            join_filters.extend(n.children[1].index_or_hash_cond)
             join_instruction = [
                 "JOIN" if n.join_type == "Inner" else f"{n.join_type} JOIN",
                 right_text,
-                f"ON {self._unwrap_expr(n.filters)}"
+                f"ON {self._unwrap_expr(join_filters)}"
             ]
             left.append(join_instruction)
+            join_output = set(self._clean_output_list(n.children[0].output))
+            join_output.update(self._clean_output_list(n.children[1].output))
+            if set(n.output) != join_output:
+                left.append(["AGGREGATE", self._clean_output(n.output)])
             return left
 
         instruction: list[list[str]] = []
-        filters: list[str] = n.filters
+        from_group_keys: Optional[list[str]] = []
+        filters: list[str] = n.full_filter(suppress_hash_index)
         if n.from_info is not None:
             from_ins = ["FROM", n.from_info.relation_name]
             if n.from_info.alias != n.from_info.relation_name:
                 from_ins.extend(["AS", n.from_info.alias])
             instruction = [from_ins]
+            from_output = self._clean_output_list(n.output)
             filters = filters.copy()
             filters.extend(f for child in n.children
                            for f in self._convert_node_to_filter(child))
         else:
             assert len(n.children) == 1
+            from_output = self._clean_output_list(n.children[0].output)
+            from_with_group = n.children[0]
+            while not from_group_keys:
+                from_group_keys = from_with_group.group_keys
+                if not from_with_group.children:
+                    break
+                from_with_group = from_with_group.children[0]
             instruction = self._convert_node_to_pipe_syntax(n.children[0])
 
         if filters:
             instruction.append(["WHERE", self._unwrap_expr(filters)])
         if n.order_by:
             instruction.append(["ORDER BY", ", ".join(n.order_by)])
-        if n.group_keys:
-            instruction.append(
-                ["AGGREGATE", "???", "GROUP BY", ", ".join(n.group_keys)])
+        if ((n.group_keys is not None and n.group_keys != from_group_keys) or
+                self._clean_output_list(n.output) != from_output):
+            aggregate_instruction = ["AGGREGATE", self._clean_output(n.output)]
+            if n.group_keys:
+                aggregate_instruction.append("GROUP BY")
+                aggregate_instruction.append(", ".join(n.group_keys))
+            instruction.append(aggregate_instruction)
         if n.node_type == "Limit":
             limit_row_guess = "???"
             if n.cost_info and n.cost_info.plan_rows:
                 limit_row_guess = str(n.cost_info.plan_rows)
             instruction.append(["LIMIT", limit_row_guess])
-
         return instruction
 
     def __str__(self) -> str:
