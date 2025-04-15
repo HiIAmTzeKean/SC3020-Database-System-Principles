@@ -1,37 +1,119 @@
+from dataclasses import dataclass
 import json
 from collections import namedtuple
 from typing import Optional
+from streamlit_flow.elements import StreamlitFlowEdge, StreamlitFlowNode
 
 from preprocessing import Database
 from project import logger
-from streamlit_flow.elements import StreamlitFlowEdge, StreamlitFlowNode
+
+
+@dataclass
+class FromInfo:
+    namespace: Optional[str]
+    relation_name: str
+    alias: str
+
+
+@dataclass
+class CostInfo:
+    startup_cost: float
+    total_cost: float
+    plan_rows: Optional[float]
+    plan_width: Optional[float]
 
 
 class QueryPlanNode:
     def __init__(self, node_data: dict[str, str | float | list[str]]) -> None:
-        self.node_type: str = node_data.get("Node Type")
-        self.startup_cost = node_data.get("Startup Cost")
-        self.total_cost = node_data.get("Total Cost")
-        self.relation_name: str = node_data.get("Relation Name")
-        self.sort_key: list[str] = node_data.get("Sort Key")
-        self.parent_relation: str = node_data.get("Parent Relationship")
-        self.index_condition: list[str] = [] if node_data.get(
-            "Index Cond") is None else [node_data.get("Index Cond")]
-        self.hash_condition: list[str] = [] if node_data.get("Hash Cond") is None else [
-                                                             node_data.get("Hash Cond")]
-        self.join_type: str = node_data.get("Join Type")
-        self.left_table: str = None
-        self.right_table: str = None
+        self.data = node_data
+        self.children: list[QueryPlanNode] = []
 
-        self.children = []
-        self.data = node_data  # Store the entire node data for potential future use
+        node_type = node_data.get("Node Type")
+        join_filter = node_data.get("Join Filter")
+        assert isinstance(node_type, str)
+        assert join_filter is None or isinstance(join_filter, str)
+        self.node_type = node_type
+        self.join_filter = join_filter
+
+        if node_type in ["Sample Scan", "Function Scan", "Tid Scan",
+                         "Tid Range Scan", "Foreign Scan", "Custom Scan",
+                         "WindowAgg", "Modify Table"]:
+            # Nodes too complex for our simple prototype.
+            logger.error("Unexpected node type: %s", node_type)
+            assert False
+
+        self.from_info = None
+        if node_type in ["Seq Scan", "Index Scan",
+                         "Index Only Scan", "Bitmap Heap Scan"]:
+            # Info from ExplainScanTarget.
+            relation_name = node_data.get("Relation Name")
+            alias = node_data.get("Alias")
+            schema = node_data.get("Schema")
+            assert isinstance(relation_name, str)
+            assert isinstance(alias, str)
+            assert schema is None or isinstance(schema, str)
+            self.from_info = FromInfo(schema, relation_name, alias)
+
+        self.join_type = None
+        if node_type in ["Nested Loop", "Merge Join", "Hash Join"]:
+            join_type = node_data.get("Join Type")
+            assert isinstance(join_type, str)
+            self.join_type = join_type
+
+        startup_cost = node_data.get("Startup Cost")
+        if startup_cost is not None:
+            total_cost = node_data.get("Total Cost")
+            plan_rows = node_data.get("Plan Rows")
+            plan_width = node_data.get("Plan Width")
+            assert isinstance(startup_cost, float)
+            assert isinstance(total_cost, float)
+            assert plan_rows is None or isinstance(plan_rows, (float, int))
+            assert plan_width is None or isinstance(plan_width, (float, int))
+            self.cost_info = CostInfo(
+                startup_cost, total_cost, plan_rows, plan_width)
+
+        self.filters: list[str] = []
+        self.order_by = None
+
+        hash_cond = node_data.get("Hash Cond")
+        index_cond = node_data.get("Index Cond")
+        filter_cond = node_data.get("Filter")
+        order_by = node_data.get("Order By")
+        sort_key = node_data.get("Sort Key")
+        if hash_cond is not None:
+            assert isinstance(hash_cond, str)
+            self.filters.append(hash_cond)
+        if index_cond is not None:
+            assert isinstance(index_cond, str)
+            self.filters.append(index_cond)
+        if filter_cond is not None:
+            assert isinstance(filter_cond, str)
+            self.filters.append(filter_cond)
+        assert order_by is None or sort_key is None
+        assert sort_key is None or isinstance(sort_key, list)
+        if order_by is not None:
+            assert isinstance(order_by, str)
+            self.order_by = [order_by]
+        else:
+            self.order_by = sort_key
+
+        group_key = node_data.get("Group Key")
+        group_set = node_data.get("Grouping Sets")
+        assert group_key is None or group_set is None
+        assert group_key is None or isinstance(group_key, list)
+        assert group_set is None or isinstance(group_set, list)
+        self.group_keys: Optional[list[str]] = None
+        if group_key is not None:
+            self.group_keys = group_key
+        elif group_set is not None:
+            self.group_keys = group_set
 
     def add_child(self, child_node: "QueryPlanNode") -> None:
         self.children.append(child_node)
 
     def __str__(self, level: int = 0) -> str:
         ret = "|>" * level + repr(self.node_type) + \
-            " (Cost: " + str(self.total_cost) + ")\n"
+            " (Cost: " + str(self.cost_info.total_cost) + ")\n"
         for child in self.children:
             ret += child.__str__(level + 1)
         return ret
@@ -74,7 +156,7 @@ class QueryExecutionPlanGraph:
         # mutable counter to maintain state during recursion
         node_counter = [1]
 
-        def _build_flow_nodes_and_edges(node: QueryPlanNode, parent_id: str = None) -> str:
+        def _build_flow_nodes_and_edges(node: QueryPlanNode, parent_id: Optional[str] = None):
             node_id = str(node_counter[0])
             node_counter[0] += 1
 
@@ -136,18 +218,19 @@ class QueryExecutionPlanGraph:
                 f"<details><summary>Details</summary><sup><strong>{node.node_type}</strong> {explanation_map.get(node.node_type, "")}</sup></details>")
 
             label = "".join(label_lines)
-            if node.data.get("Relation Name"):
-                label += f"on {node.data.get('Relation Name')}"
-                if node.data.get("Alias") and node.data.get("Relation Name") != node.data.get("Alias"):
-                    label += f" {node.data.get('Alias')}"
+            if node.from_info:
+                label += f"on {node.from_info.relation_name}"
+                if node.from_info.relation_name != node.from_info.alias:
+                    label += f" {node.from_info.alias}"
                 label += "<br>"
-            if node.data.get("Join Type"):
-                label += f"{node.data.get('Join Type')} join<br>"
-            if node.data.get("Hash Cond"):
-                label += f"on {node.data.get('Hash Cond')}<br>"
+            if node.join_type:
+                label += f"{node.join_type} join<br>"
+            if node.filters:
+                label += f"on {node.filters}<br>"
 
-            if node.data.get("Total Cost"):
-                label += f"💲 <b>Cost:</b> {node.data.get('Total Cost')}<br>"
+            if node.cost_info:
+                label += f"💲 <b>Cost:</b> {node.cost_info.total_cost}<br>"
+
             if node.data.get("Actual Total Time"):
                 label += f"⌛ <b>Time:</b> {
                     node.data.get('Actual Total Time')}<br>"
@@ -193,7 +276,8 @@ RelationInfo = namedtuple(
 class PipeSyntax:
     """PipeSyntax class to represent a SQL query in pipe syntax.
 
-    This class holds the SQL query and provides methods to generate the pipe syntax.
+    This class holds the SQL query and provides methods to generate the pipe
+    syntax.
     """
 
     def __init__(self, qep: QueryExecutionPlanGraph) -> None:
@@ -206,82 +290,98 @@ class PipeSyntax:
         Generate the pipe syntax from the query.
         """
         if not hasattr(self, "pipesyntax"):
-            logger.info(f"Generating pipe syntax for query: {self.query}")
+            logger.info("Generating pipe syntax for query: %s", self.query)
             self.qep.generate()
             self.pipesyntax = self._convert_to_pipe_syntax()
         return self.pipesyntax
-
-    def _handle_child_return(self, child_return: Optional[RelationInfo], node: QueryPlanNode) -> None:
-        if child_return is None:
-            return
-        if child_return.node_type == "scan" and "join" in node.node_type.lower():
-            if node.left_table is None:
-                node.left_table = child_return.relation_name
-            elif node.right_table is None:
-                node.right_table = child_return.relation_name
-            else:
-                raise ValueError("More than two children for a join node.")
-            node.index_condition.extend(child_return.index_condition)
-        elif child_return.node_type == "scan":
-            node.relation_name = child_return.relation_name if node.relation_name is None else node.relation_name
-            node.index_condition.extend(child_return.index_condition)
-
-    def _traverse_bottom_up(self, node: QueryPlanNode, result_list: list) -> RelationInfo | None:
-        """
-        Traverses the query plan graph in a bottom-up manner.
-        """
-        for child in node.children:
-            child_return = self._traverse_bottom_up(child, result_list)
-            self._handle_child_return(child_return, node)
-
-        if "scan" in node.node_type.lower() or node.node_type.lower() == "hash":
-            # push relation and index condition to up
-            return RelationInfo("scan", node.relation_name, node.index_condition)
-
-        result_list.append(node)
-
-    def _generate_bottom_up_output(self, root_node: QueryPlanNode) -> list[QueryPlanNode]:
-        """
-        Generates a bottom-up output from the query plan graph.
-        """
-        result_list = []
-        self._traverse_bottom_up(root_node, result_list)
-        return result_list
 
     def _convert_to_pipe_syntax(self) -> str:
         """
         Convert the qep to pipe syntax.
         """
-        parse_list = self._generate_bottom_up_output(self.qep.root)
-        ret = ""
-        for node in parse_list:
-            node_type = node.node_type
-            assert type(node_type) is str
-            if node_type == "Sort":
-                order_list = node.sort_key
-                assert type(order_list) is list
-                ret += f"ORDER BY {','.join(order_list)
-                                   } (Cost: {node.total_cost})\n"
-            elif "scan" in node_type.lower():
-                ret += f"{node_type} on {
-                    node.relation_name} (Cost: {node.total_cost})\n"
-            elif "join" in node_type.lower():
+        piped = self._convert_node_to_pipe_syntax(self.qep.root)
+        return "\n|> ".join(" ".join(x) for x in piped)
 
+    def _unwrap_expr(self, expr: list[str]) -> str:
+        if len(expr) == 1 and expr[0][0] == '(' and expr[0][-1] == ')':
+            return expr[0][1:-1]
+        return " AND ".join(expr)
 
-<< << << < HEAD
-                ret += f"{node.parent_relation} JOIN {
-                    node.relation_name} (Cost: {node.total_cost})\n"
-== == == =
-                ret += f"{node.join_type.upper()} JOIN {node.left_table} WITH {node.right_table} ON {
-                                               node.hash_condition, node.index_condition} (Cost: {node.total_cost})\n"
->>>>>> > 7debdcd(Add relatively stable parsing)
-            else:
-                ret += f"{node_type} (Cost: {node.total_cost})\n"
-            ret += "|> "
-        ret = ret[:-4]
-        ret += ";"
-        ret += "\n"
-        return ret
+    def _convert_node_to_filter(self, n: QueryPlanNode) -> list[str]:
+        if "Bitmap" not in n.node_type:
+            logger.error("Unexpected node type in filter: %s", n.node_type)
+            assert False
+        if n.node_type == "BitmapAnd":
+            results = []
+            for child in n.children:
+                results.extend(self._convert_node_to_filter(child))
+            assert len(n.filters) == 0
+            return results
+        if n.node_type == "BitmapOr":
+            results = []
+            for child in n.children:
+                result = self._convert_node_to_filter(child)
+                if len(result) == 1:
+                    results.append(result[0])
+                else:
+                    results.append(f"({" AND ".join(result)})")
+            assert len(n.filters) == 0
+            return [f"({" OR ".join(results)})"]
+        if len(n.filters) > 0:
+            return n.filters
+        logger.error("Unknown node type in filter: %s", n.node_type)
+        assert False
+
+    def _convert_node_to_pipe_syntax(self, n: QueryPlanNode) -> list[list[str]]:
+        if n.join_type is not None:
+            assert len(n.children) == 2
+            left = self._convert_node_to_pipe_syntax(n.children[0])
+            right = self._convert_node_to_pipe_syntax(n.children[1])
+            # Choose the shorter one as the source.
+            if len(left) < len(right):
+                left, right = right, left
+            right_expr = "\n\t|> ".join(
+                " ".join(y.replace("\n", "\n\t") for y in x) for x in right)
+            right_text = f"(\n\t{right_expr}\n)"
+            if len(right) == 1 and right[0][0] == "FROM":
+                # FROM a AS b -> a AS b.
+                right_text = " ".join(right[0][1:])
+            join_instruction = [
+                "JOIN" if n.join_type == "Inner" else f"{n.join_type} JOIN",
+                right_text,
+                f"ON {self._unwrap_expr(n.filters)}"
+            ]
+            left.append(join_instruction)
+            return left
+
+        instruction: list[list[str]] = []
+        filters: list[str] = n.filters
+        if n.from_info is not None:
+            from_ins = ["FROM", n.from_info.relation_name]
+            if n.from_info.alias != n.from_info.relation_name:
+                from_ins.extend(["AS", n.from_info.alias])
+            instruction = [from_ins]
+            filters = filters.copy()
+            filters.extend(f for child in n.children
+                           for f in self._convert_node_to_filter(child))
+        else:
+            assert len(n.children) == 1
+            instruction = self._convert_node_to_pipe_syntax(n.children[0])
+
+        if filters:
+            instruction.append(["WHERE", self._unwrap_expr(filters)])
+        if n.order_by:
+            instruction.append(["ORDER BY", ", ".join(n.order_by)])
+        if n.group_keys:
+            instruction.append(
+                ["AGGREGATE", "???", "GROUP BY", ", ".join(n.group_keys)])
+        if n.node_type == "Limit":
+            limit_row_guess = "???"
+            if n.cost_info and n.cost_info.plan_rows:
+                limit_row_guess = str(n.cost_info.plan_rows)
+            instruction.append(["LIMIT", limit_row_guess])
+
+        return instruction
 
     def __str__(self) -> str:
         if not hasattr(self, "pipesyntax"):
@@ -295,22 +395,30 @@ class PipeSyntax:
 class PipeSyntaxParser:
     def __init__(self, database: Database) -> None:
         self.database = database
-        self.current_query = None
+        self.current_query: Optional[str] = None
         self.qep_graph: QueryExecutionPlanGraph
         self.pipesyntax: PipeSyntax
 
         logger.info("PipeSyntaxParser initialized with database.")
 
-    def _get_qep(self, query: str) -> str:
+    def _get_qep(self, query: str) -> Optional[str]:
+        # with open("sql_qep.txt", "r", encoding="utf-8") as file:
+        #     qep = file.read()
+        #     return qep
         qep = self.database.get_qep(query)
         return qep
 
-    def _compute_query(self, query: str) -> None:
-        qep = self._get_qep(query)
-        self.qep_graph = QueryExecutionPlanGraph(query, qep)
-        self.qep_graph.generate()
-        self.pipesyntax = PipeSyntax(self.qep_graph)
-        self.pipesyntax.generate()
+    def _compute_query(self, query: str):
+        try:
+            qep = self._get_qep(query)
+            print(qep)
+            assert qep is not None
+            self.qep_graph = QueryExecutionPlanGraph(query, qep)
+            self.qep_graph.generate()
+            self.pipesyntax = PipeSyntax(self.qep_graph)
+            self.pipesyntax.generate()
+        except AssertionError as e:
+            logger.exception("Internal error has occurred.", exc_info=e)
 
     def get_pipe_syntax(self, query: str) -> PipeSyntax:
         """
@@ -326,7 +434,7 @@ class PipeSyntaxParser:
             return self.pipesyntax
 
         self.current_query = query
-        logger.info(f"Getting pipe syntax for query: {query}")
+        logger.info("Getting pipe syntax for query: %s", query)
         self._compute_query(query)
         return self.pipesyntax
 
@@ -344,7 +452,7 @@ class PipeSyntaxParser:
             return self.qep_graph
 
         self.current_query = query
-        logger.info(f"Getting qep for query: {query}")
+        logger.info("Getting qep for query: %s", query)
         self._compute_query(query)
         return self.qep_graph
 
@@ -353,6 +461,5 @@ if __name__ == "__main__":
     # Example usage
     db = Database()
     parser = PipeSyntaxParser(db)
-    query = "some query"
-    pipe_syntax = parser.get_pipe_syntax(query)
+    pipe_syntax = parser.get_pipe_syntax("some query")
     print(pipe_syntax)
