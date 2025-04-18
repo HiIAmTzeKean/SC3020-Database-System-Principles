@@ -1,6 +1,7 @@
 import logging
 import sys
 
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 from streamlit.web import cli as stcli
 
 
@@ -14,5 +15,8 @@ logging.basicConfig(
 logger = logging.getLogger("DBPiper")
 
 if __name__ == "__main__":
-    sys.argv = ["streamlit", "run", "proj_2/interface.py"]
-    sys.exit(stcli.main())
+    if get_script_run_ctx() is None:
+        sys.argv = ["streamlit", "run", "proj_2/interface.py"]
+        sys.exit(stcli.main())
+    else:
+        logger.error("A Streamlit runtime is already active. Exiting to avoid conflicts.")
