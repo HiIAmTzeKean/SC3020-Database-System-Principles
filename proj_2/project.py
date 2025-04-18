@@ -1,6 +1,7 @@
 import logging
-import subprocess
-
+import signal
+import sys
+import os
 
 # Configure the global logger
 logging.basicConfig(
@@ -11,6 +12,16 @@ logging.basicConfig(
 
 logger = logging.getLogger("DBPiper")
 
+
+def signal_handler(sig, frame):
+    sys.exit(0)
+
+
 if __name__ == "__main__":
-    # Run Streamlit server i.e. CLI command "streamlit run interface.py"
-    subprocess.run(["streamlit", "run", "interface.py"])
+    # Register signal handler for SIGINT (Ctrl+C)
+    signal.signal(signal.SIGINT, signal_handler)
+
+    try:
+        os.system('streamlit run interface.py')
+    except KeyboardInterrupt:
+        signal_handler(None, None)
