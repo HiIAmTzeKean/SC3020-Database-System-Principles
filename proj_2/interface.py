@@ -178,7 +178,7 @@ def main():
 
         col1_1, col1_2 = st.columns([2, 4], gap="small")
         with col1_1:
-            if st.button("Get Pipe Syntax & QEP", type="primary"):
+            if st.button("Get Pipe Syntax & QEP", type="primary", use_container_width=True):
                 # Reset
                 st.session_state.qep_results = ""
                 st.session_state.pipe_syntax_result = ""
@@ -212,7 +212,7 @@ def main():
                         else:
                             error_msg = f"Failed to get QEP. Error:  \n{str(e)}"
 
-            if st.button("Run Query"):
+            if st.button("Get Query Output", use_container_width=True):
                 # Reset
                 st.session_state.qep_results = ""
                 st.session_state.pipe_syntax_result = ""
