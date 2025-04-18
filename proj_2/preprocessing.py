@@ -59,7 +59,7 @@ class Database:
         """Retrieves the Query Execution Plan (QEP) for a given SQL query."""
         try:
             self.cursor.execute(
-                sql.SQL("EXPLAIN (ANALYZE, FORMAT JSON) {}").format(sql.SQL(query))
+                sql.SQL("EXPLAIN (ANALYZE, FORMAT JSON, VERBOSE TRUE) {}").format(sql.SQL(query))
             )
             qep_result = self.cursor.fetchone()[0]
             return json.dumps(qep_result)
