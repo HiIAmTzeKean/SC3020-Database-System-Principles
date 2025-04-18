@@ -14,5 +14,5 @@ logging.basicConfig(
 logger = logging.getLogger("DBPiper")
 
 if __name__ == "__main__":
-    sys.argv = ["streamlit", "run", "interface.py"]
+    sys.argv = ["streamlit", "run", "proj_2/interface.py"]
     sys.exit(stcli.main())
