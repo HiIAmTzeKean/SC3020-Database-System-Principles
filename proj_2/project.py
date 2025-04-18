@@ -15,5 +15,4 @@ logger = logging.getLogger("DBPiper")
 if __name__ == "__main__":
     # Run Streamlit server i.e. CLI command "streamlit run interface.py"
     logger.info(os.getcwd())
-    # subprocess.run(["pwd"])
-    subprocess.run(["streamlit", "run", "interface.py"])
+    subprocess.run(["streamlit", "run", "proj_2/interface.py"])
