@@ -1,11 +1,12 @@
-import streamlit as st
-from preprocessing import Database
-from pipesyntax import PipeSyntaxParser
-from streamlit_flow import streamlit_flow
-from streamlit_flow.state import StreamlitFlowState
-from streamlit_flow.layouts import LayeredLayout
 import json
+
+import streamlit as st
+from pipesyntax import PipeSyntaxParser
+from preprocessing import Database
 from streamlit_ace import st_ace
+from streamlit_flow import streamlit_flow
+from streamlit_flow.layouts import LayeredLayout
+from streamlit_flow.state import StreamlitFlowState
 
 
 st.set_page_config(page_title="QEP Visualizer", layout="wide")

@@ -1,11 +1,11 @@
-from dataclasses import dataclass
 import json
 from collections import namedtuple
+from dataclasses import dataclass
 from typing import Optional
-from streamlit_flow.elements import StreamlitFlowEdge, StreamlitFlowNode
 
 from preprocessing import Database
 from project import logger
+from streamlit_flow.elements import StreamlitFlowEdge, StreamlitFlowNode
 
 
 @dataclass
