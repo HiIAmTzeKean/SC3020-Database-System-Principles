@@ -14,6 +14,7 @@ st.set_page_config(page_title="QEP Visualizer", layout="wide")
 default_session_states = {
     "page": "login",
     "db_connection": None,
+    "db_schema": None,
     "db_location": "Cloud",
     "db_name": "",
     "selected_example_query": "",
@@ -135,6 +136,7 @@ def login():
                     st.session_state.db_connection = db
                     st.session_state.pipe_syntax_parser = PipeSyntaxParser(db)
                     st.session_state.db_name = db_params["dbname"]
+                    st.session_state.db_schema = st.session_state.db_connection.get_db_schema()
 
                     st.session_state.page = "main"
                     st.rerun()
@@ -146,9 +148,8 @@ def main():
     st.sidebar.header(f"Current Database: {st.session_state.db_name}")
 
     st.sidebar.subheader("DB Schema")
-    if st.session_state.db_connection:
-        db_schema = st.session_state.db_connection.get_db_schema()
-        for table, schema in db_schema.items():
+    if st.session_state.db_schema:
+        for table, schema in st.session_state.db_schema.items():
             with st.sidebar.expander(table):
                 for attribute, data_type in schema.items():
                     st.markdown(f"- **{attribute}**: {data_type}")
