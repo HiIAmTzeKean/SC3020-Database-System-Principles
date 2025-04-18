@@ -166,8 +166,8 @@ def main():
         sql_query = st_ace(
             value=st.session_state.selected_example_query.strip(),
             language="sql",
-            height=200,
-            font_size=18,
+            height=300,
+            font_size=16,
             theme="sqlserver",
             auto_update=True,
             key=f"editor_{st.session_state.editor_rerun_key}",
@@ -243,8 +243,8 @@ def main():
         pipe_syntax_result = st_ace(
             value=st.session_state.pipe_syntax_result,
             language="c_cpp",  # just for syntax highlighting style
-            height=200,
-            font_size=18,
+            height=300,
+            font_size=16,
             theme="terminal",
             readonly=True,
             show_gutter=False,
