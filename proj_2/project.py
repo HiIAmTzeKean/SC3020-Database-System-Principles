@@ -1,6 +1,7 @@
 import logging
-import os
-import subprocess
+import sys
+
+from streamlit.web import cli as stcli
 
 
 # Configure the global logger
@@ -13,6 +14,5 @@ logging.basicConfig(
 logger = logging.getLogger("DBPiper")
 
 if __name__ == "__main__":
-    # Run Streamlit server i.e. CLI command "streamlit run interface.py"
-    logger.info(os.getcwd())
-    subprocess.run(["streamlit", "run", "proj_2/interface.py"])
+    sys.argv = ["streamlit", "run", "interface.py"]
+    sys.exit(stcli.main())
