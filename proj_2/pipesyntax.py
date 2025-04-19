@@ -354,7 +354,8 @@ class PipeSyntax:
             join_instruction = [
                 "JOIN" if n.join_type == "Inner" else f"{n.join_type} JOIN",
                 right_text,
-                f"ON {self._unwrap_expr(join_filters)}"
+                f"ON {self._unwrap_expr(join_filters)}",
+                f"<!COST {n.cost_info.total_cost}!>"
             ]
             left.append(join_instruction)
             join_output = set(self._clean_output_list(n.children[0].output))
@@ -370,6 +371,7 @@ class PipeSyntax:
             from_ins = ["FROM", n.from_info.relation_name]
             if n.from_info.alias != n.from_info.relation_name:
                 from_ins.extend(["AS", n.from_info.alias])
+            from_ins.extend([f"<!COST {n.cost_info.total_cost}!>"])
             instruction = [from_ins]
             from_output = self._clean_output_list(n.output)
             filters = filters.copy()
@@ -387,12 +389,12 @@ class PipeSyntax:
             instruction = self._convert_node_to_pipe_syntax(n.children[0])
 
         if filters:
-            instruction.append(["WHERE", self._unwrap_expr(filters)])
+            instruction.append(["WHERE", self._unwrap_expr(filters), f"<!COST {n.cost_info.total_cost}!>"])
         if n.order_by:
-            instruction.append(["ORDER BY", ", ".join(n.order_by)])
+            instruction.append(["ORDER BY", ", ".join(n.order_by), f"<!COST {n.cost_info.total_cost}!>"])
         if ((n.group_keys is not None and n.group_keys != from_group_keys) or
                 self._clean_output_list(n.output) != from_output):
-            aggregate_instruction = ["AGGREGATE", self._clean_output(n.output)]
+            aggregate_instruction = ["AGGREGATE", self._clean_output(n.output), f"<!COST {n.cost_info.total_cost}!>"]
             if n.group_keys:
                 aggregate_instruction.append("GROUP BY")
                 aggregate_instruction.append(", ".join(n.group_keys))
@@ -401,7 +403,7 @@ class PipeSyntax:
             limit_row_guess = "???"
             if n.cost_info and n.cost_info.plan_rows:
                 limit_row_guess = str(n.cost_info.plan_rows)
-            instruction.append(["LIMIT", limit_row_guess])
+            instruction.append(["LIMIT", limit_row_guess, f"<!COST {n.cost_info.total_cost}!>"])
         return instruction
 
     def __str__(self) -> str:
@@ -423,9 +425,6 @@ class PipeSyntaxParser:
         logger.info("PipeSyntaxParser initialized with database.")
 
     def _get_qep(self, query: str) -> Optional[str]:
-        # with open("sql_qep.txt", "r", encoding="utf-8") as file:
-        #     qep = file.read()
-        #     return qep
         qep = self.database.get_qep(query)
         return qep
 
