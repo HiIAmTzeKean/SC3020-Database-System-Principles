@@ -248,6 +248,7 @@ def main():
             height=300,
             font_size=16,
             theme="terminal",
+            auto_update=True,
             readonly=True,
             show_gutter=False,
         )
