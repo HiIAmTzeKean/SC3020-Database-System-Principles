@@ -232,7 +232,7 @@ def main():
         with col1_2:
             with st.expander(label="Select an Example Query", expanded=False):
                 for query_name, query in example_queries.items():
-                    if st.button(query_name):
+                    if st.button(query_name, use_container_width=True):
                         st.session_state.selected_example_query = query
                         st.session_state.editor_rerun_key += 1  # force code editor to rerun
                         st.rerun()
