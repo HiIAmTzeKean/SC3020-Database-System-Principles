@@ -1,4 +1,44 @@
-## Setting up PostgreSQL
+## Project Setup
+
+Project can be setup using either `pip` or `poetry` package managers.
+### Installation with pip
+1. Open a command prompt or terminal window in the root of the extracted source code directory.
+2. Create a Python virtual environment (only need to be done once).
+```bash
+python -m venv .venv
+```
+3. Activate the virtual environment for the directory.
+
+Mac:
+```bash
+source .venv/bin/activate
+```
+Windows:
+```bash
+.venv/Scripts/activate
+```
+4. Install the required Python dependencies from the `pyproject.toml` file.
+```bash
+python -m pip install .
+```
+5. Run the application.
+```bash
+python project.py
+```
+
+### Installation with Poetry
+1. Open a command prompt or terminal window in the root of the extracted source code directory.
+2. Install the required Python dependencies from the `pyproject.toml` file.
+```bash
+poetry install
+```
+3. Run the application.
+```bash
+python project.py
+```
+
+
+## PostgreSQL Database Setup
 
 Set up PostgreSQL either manually or using Docker. 
 
