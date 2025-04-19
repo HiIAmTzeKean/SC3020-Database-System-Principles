@@ -173,12 +173,10 @@ class QueryExecutionPlanGraph:
             # get node details
             label_lines = [f"<h5>{node.node_type}</h5>"]
 
-            relation = node.data.get("Relation Name")
-            alias = node.data.get("Alias")
-            if relation:
-                line = f"on {relation}"
-                if alias and alias != relation:
-                    line += f" {alias}"
+            if node.from_info:
+                line = f"on {node.from_info.relation_name}"
+                if node.from_info.alias != node.from_info.relation_name:
+                    line += f" {node.from_info.alias}"
                 label_lines.append(line + "<br>")
 
             fields = [
@@ -228,26 +226,6 @@ class QueryExecutionPlanGraph:
                 f"<details><summary>Details</summary><sup><strong>{node.node_type}</strong> {explanation_map.get(node.node_type, "")}</sup></details>")
 
             label = "".join(label_lines)
-            if node.from_info:
-                label += f"on {node.from_info.relation_name}"
-                if node.from_info.relation_name != node.from_info.alias:
-                    label += f" {node.from_info.alias}"
-                label += "<br>"
-            if node.join_type:
-                label += f"{node.join_type} join<br>"
-            if node.filters:
-                label += f"on {node.filters}<br>"
-
-            if node.cost_info:
-                label += f"💲 <b>Cost:</b> {node.cost_info.total_cost}<br>"
-
-            if node.data.get("Actual Total Time"):
-                label += f"⌛ <b>Time:</b> {
-                    node.data.get('Actual Total Time')}<br>"
-
-            label += (
-                "<details><summary>Details</summary><sup>more details here if we want</sup></details>"  # TODO details
-            )
 
             flow_node = StreamlitFlowNode(
                 id=node_id,
